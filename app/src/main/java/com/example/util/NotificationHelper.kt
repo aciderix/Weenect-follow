@@ -92,8 +92,13 @@ class NotificationHelper(private val context: Context) {
         )
 
         val distStr = GeoUtils.formatDistance(distanceMeters)
+        val appIconBitmap = try {
+            android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
+        } catch (_: Exception) {
+            null
+        }
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("🚨 ALERTE : ${resident.name} HORS ZONE !")
             .setContentText("Le résident est à $distStr du centre de l'établissement (${resident.roomNumber})")
@@ -122,7 +127,12 @@ class NotificationHelper(private val context: Context) {
                 "Guidage GPS",
                 navPendingIntent
             )
-            .build()
+
+        if (appIconBitmap != null) {
+            notificationBuilder.setLargeIcon(appIconBitmap)
+        }
+
+        val notification = notificationBuilder.build()
 
         notificationManager.notify(NOTIFICATION_ID_OFFSET + resident.id.toInt(), notification)
     }

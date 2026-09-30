@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "SécuriRésident"
+rootProject.name = "Alerte Résidents"
 
 include(":app")

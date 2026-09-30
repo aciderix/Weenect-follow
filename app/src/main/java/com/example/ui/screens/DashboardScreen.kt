@@ -157,7 +157,7 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "SécuriRésident",
+                                text = "Alerte Résidents",
                                 fontWeight = FontWeight.Black,
                                 fontSize = 19.sp,
                                 color = Color.White

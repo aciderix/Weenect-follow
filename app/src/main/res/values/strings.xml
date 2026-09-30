@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">SécuriRésident</string>
+    <string name="app_name">Alerte Résidents</string>
     <string name="nav_dashboard">Tableau de bord</string>
     <string name="nav_map">Carte</string>
     <string name="nav_residents">Résidents</string>

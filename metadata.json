@@ -1,6 +1,6 @@
 {
-  "name": "SécuriRésident",
-  "description": "Suivi en temps réel des résidents par balise GPS Weenect, alerte instantanée hors zone de sécurité pour le personnel soignant et carte interactive.",
+  "name": "Alerte Résidents",
+  "description": "Application professionnelle de télésurveillance et d'alerte en temps réel des résidents pour établissements de santé (MAS, EHPAD, FAM).",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
