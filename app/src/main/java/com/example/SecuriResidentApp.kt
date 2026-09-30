@@ -41,6 +41,8 @@ class SecuriResidentApp : Application() {
         )
 
         createNotificationChannels()
+        // Démarrer la surveillance permanente en arrière-plan (active 24h/24 même app fermée)
+        com.example.service.ResidentMonitoringService.start(this)
     }
 
     private fun createNotificationChannels() {

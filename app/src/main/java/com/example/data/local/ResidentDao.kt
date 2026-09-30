@@ -14,6 +14,9 @@ interface ResidentDao {
     @Query("SELECT * FROM residents ORDER BY name ASC")
     fun getAllResidents(): Flow<List<Resident>>
 
+    @Query("SELECT * FROM residents ORDER BY name ASC")
+    suspend fun getAllResidentsOnce(): List<Resident>
+
     @Query("SELECT * FROM residents WHERE id = :id")
     suspend fun getResidentById(id: Long): Resident?
 

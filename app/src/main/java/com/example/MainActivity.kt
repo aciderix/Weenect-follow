@@ -89,6 +89,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Garantir que le service d'arrière-plan permanent est bien actif
+        com.example.service.ResidentMonitoringService.start(this)
         handleIncomingIntent(intent)
         setContent {
             MyApplicationTheme {
