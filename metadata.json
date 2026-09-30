@@ -1,0 +1,6 @@
+{
+  "name": "SécuriRésident",
+  "description": "Suivi en temps réel des résidents par balise GPS Weenect, alerte instantanée hors zone de sécurité pour le personnel soignant et carte interactive.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">SécuriRésident</string>
+    <string name="nav_dashboard">Tableau de bord</string>
+    <string name="nav_map">Carte</string>
+    <string name="nav_residents">Résidents</string>
+    <string name="nav_alerts">Alertes</string>
+    <string name="nav_settings">Paramètres</string>
+
+    <!-- Statuts -->
+    <string name="status_safe">En sécurité</string>
+    <string name="status_in_zone">Dans l\'établissement</string>
+    <string name="status_out_of_zone">HORS ZONE DE SÉCURITÉ</string>
+    <string name="status_unknown">Position en attente</string>
+    <string name="status_low_battery">Batterie faible (&lt; 20%)</string>
+    <string name="status_offline">Balise déconnectée</string>
+
+    <!-- Actions -->
+    <string name="action_refresh">Rafraîchir position</string>
+    <string name="action_superlive">Activer SuperLive (1s)</string>
+    <string name="action_ring">Faire sonner la balise</string>
+    <string name="action_vibrate">Faire vibrer la balise</string>
+    <string name="action_navigate">Itinéraire vers le résident</string>
+    <string name="action_add_resident">Ajouter un résident</string>
+    <string name="action_edit_zone">Définir zone établissement</string>
+
+    <!-- Carte & Zone -->
+    <string name="zone_radius_label">Rayon de sécurité</string>
+    <string name="zone_center_label">Position centrale de l\'établissement</string>
+</resources>
