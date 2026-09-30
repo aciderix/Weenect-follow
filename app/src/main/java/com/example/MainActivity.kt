@@ -1,11 +1,14 @@
 package com.example
 
 import android.Manifest
+import android.app.KeyguardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -88,6 +91,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setupLockscreenWakeup()
         enableEdgeToEdge()
         // Garantir que le service d'arrière-plan permanent est bien actif
         com.example.service.ResidentMonitoringService.start(this)
@@ -99,9 +103,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        setupLockscreenWakeup()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setupLockscreenWakeup()
         handleIncomingIntent(intent)
+    }
+
+    private fun setupLockscreenWakeup() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            keyguardManager?.requestDismissKeyguard(this, null)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        }
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
