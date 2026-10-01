@@ -1,6 +1,9 @@
 package com.example.ui.components
 
+import android.Manifest
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -77,6 +80,50 @@ fun ZoneEditorDialog(
     var vibrateAlerts by remember { mutableStateOf(currentZone.vibrateAlertsEnabled) }
     var refreshInterval by remember { mutableIntStateOf(currentZone.refreshIntervalSeconds) }
     var isFetchingLocation by remember { mutableStateOf(false) }
+
+    fun fetchGpsLocation() {
+        isFetchingLocation = true
+        scope.launch {
+            try {
+                val loc = LocationHelper.getCurrentLocation(context)
+                isFetchingLocation = false
+                if (loc != null) {
+                    latText = String.format(Locale.US, "%.6f", loc.latitude)
+                    lonText = String.format(Locale.US, "%.6f", loc.longitude)
+                    Toast.makeText(
+                        context,
+                        "Position GPS fixée avec succès : ${String.format(Locale.US, "%.4f", loc.latitude)}, ${String.format(Locale.US, "%.4f", loc.longitude)}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Impossible de récupérer le GPS. Activez la localisation de l'appareil.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } catch (e: Exception) {
+                isFetchingLocation = false
+                Toast.makeText(context, "Erreur lors de la capture GPS: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (fineGranted || coarseGranted) {
+            fetchGpsLocation()
+        } else {
+            Toast.makeText(
+                context,
+                "Permission de localisation requise pour fixer la position par GPS.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -193,25 +240,15 @@ fun ZoneEditorDialog(
                 // Bouton Prendre ma position actuelle (réel GPS téléphone)
                 OutlinedButton(
                     onClick = {
-                        isFetchingLocation = true
-                        scope.launch {
-                            val loc = LocationHelper.getCurrentLocation(context)
-                            isFetchingLocation = false
-                            if (loc != null) {
-                                latText = String.format(Locale.US, "%.6f", loc.latitude)
-                                lonText = String.format(Locale.US, "%.6f", loc.longitude)
-                                Toast.makeText(
-                                    context,
-                                    "Position GPS fixée avec succès : ${String.format(Locale.US, "%.4f", loc.latitude)}, ${String.format(Locale.US, "%.4f", loc.longitude)}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } else {
-                                Toast.makeText(
-                                    context,
-                                    "Impossible de récupérer le GPS. Activez la localisation de l'appareil.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
+                        if (LocationHelper.hasLocationPermission(context)) {
+                            fetchGpsLocation()
+                        } else {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

@@ -1,6 +1,9 @@
 package com.example.ui.components
 
+import android.Manifest
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -142,9 +145,46 @@ fun VisualZonePickerDialog(
     var subZoom by remember { mutableFloatStateOf(1.0f) }
     var currentStyle by remember { mutableStateOf(MapTileStyle.OPEN_STREET_MAP) }
     var isLocating by remember { mutableStateOf(false) }
-
     var panOffsetX by remember { mutableFloatStateOf(0f) }
     var panOffsetY by remember { mutableFloatStateOf(0f) }
+
+    fun fetchCurrentGpsLocation() {
+        isLocating = true
+        scope.launch {
+            try {
+                val loc = LocationHelper.getCurrentLocation(context)
+                isLocating = false
+                if (loc != null) {
+                    centerLat = loc.latitude
+                    centerLon = loc.longitude
+                    panOffsetX = 0f
+                    panOffsetY = 0f
+                    Toast.makeText(context, "Position GPS fixée", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Impossible d'obtenir le GPS. Activez la localisation.", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                isLocating = false
+                Toast.makeText(context, "Erreur GPS: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (fineGranted || coarseGranted) {
+            fetchCurrentGpsLocation()
+        } else {
+            Toast.makeText(
+                context,
+                "Permission de localisation requise pour centrer la carte sur votre position.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     val tileCacheVersion = tileProvider.loadedTiles.size
 
@@ -477,19 +517,15 @@ fun VisualZonePickerDialog(
                 ) {
                     FilledIconButton(
                         onClick = {
-                            isLocating = true
-                            scope.launch {
-                                val loc = LocationHelper.getCurrentLocation(context)
-                                isLocating = false
-                                if (loc != null) {
-                                    centerLat = loc.latitude
-                                    centerLon = loc.longitude
-                                    panOffsetX = 0f
-                                    panOffsetY = 0f
-                                    Toast.makeText(context, "Position GPS fixée", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Impossible d'obtenir le GPS", Toast.LENGTH_LONG).show()
-                                }
+                            if (LocationHelper.hasLocationPermission(context)) {
+                                fetchCurrentGpsLocation()
+                            } else {
+                                locationPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
                             }
                         },
                         colors = IconButtonDefaults.filledIconButtonColors(
