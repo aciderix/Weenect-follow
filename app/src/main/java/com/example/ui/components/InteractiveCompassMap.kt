@@ -219,35 +219,66 @@ fun InteractiveCompassMap(
                 }
             }
 
-            // 2. Security Perimeter Circle (exact ground scale)
-            val mpp = MapTileProvider.metersPerPixel(centerLat, zoomLevel)
-            val zoneRadiusPx = (facilityZone.radiusMeters / mpp).toFloat() * subZoom
-
-            // Translucent green protective zone
-            drawCircle(
-                color = SafeGreen.copy(alpha = if (currentStyle == MapTileStyle.SATELLITE) 0.25f else 0.18f),
-                radius = zoneRadiusPx,
-                center = Offset(screenCenterX, screenCenterY)
-            )
-            // Solid crisp safety border
-            drawCircle(
-                color = SafeGreen,
-                radius = zoneRadiusPx,
-                center = Offset(screenCenterX, screenCenterY),
-                style = Stroke(width = 3.dp.toPx())
-            )
-
-            // Concentric 50m / 100m guide ring
-            val guideRadiusPx = (50.0 / mpp).toFloat() * subZoom
-            drawCircle(
-                color = SafeGreen.copy(alpha = 0.35f),
-                radius = guideRadiusPx,
-                center = Offset(screenCenterX, screenCenterY),
-                style = Stroke(
-                    width = 1.5.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+            // 2. Security Perimeter (Custom Polygon or Exact Ground Scale Circle)
+            if (facilityZone.zoneType == "POLYGON" && facilityZone.getPolygonPoints().size >= 3) {
+                val polyPoints = facilityZone.getPolygonPoints()
+                val screenPoints = polyPoints.map { (pLat, pLon) ->
+                    val (pWorldX, pWorldY) = MapTileProvider.latLonToWorld(pLat, pLon, zoomLevel)
+                    val sX = screenCenterX + ((pWorldX - centerWorldX) * subZoom).toFloat()
+                    val sY = screenCenterY + ((pWorldY - centerWorldY) * subZoom).toFloat()
+                    Offset(sX, sY)
+                }
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(screenPoints[0].x, screenPoints[0].y)
+                    for (i in 1 until screenPoints.size) {
+                        lineTo(screenPoints[i].x, screenPoints[i].y)
+                    }
+                    close()
+                }
+                drawPath(
+                    path = path,
+                    color = SafeGreen.copy(alpha = if (currentStyle == MapTileStyle.SATELLITE) 0.30f else 0.22f),
+                    style = androidx.compose.ui.graphics.drawscope.Fill
                 )
-            )
+                drawPath(
+                    path = path,
+                    color = SafeGreen,
+                    style = Stroke(width = 3.5.dp.toPx())
+                )
+                screenPoints.forEach { pt ->
+                    drawCircle(color = Color.White, radius = 6.dp.toPx(), center = pt)
+                    drawCircle(color = SafeNavy, radius = 4.dp.toPx(), center = pt)
+                }
+            } else {
+                val mpp = MapTileProvider.metersPerPixel(centerLat, zoomLevel)
+                val zoneRadiusPx = (facilityZone.radiusMeters / mpp).toFloat() * subZoom
+
+                // Translucent green protective zone
+                drawCircle(
+                    color = SafeGreen.copy(alpha = if (currentStyle == MapTileStyle.SATELLITE) 0.25f else 0.18f),
+                    radius = zoneRadiusPx,
+                    center = Offset(screenCenterX, screenCenterY)
+                )
+                // Solid crisp safety border
+                drawCircle(
+                    color = SafeGreen,
+                    radius = zoneRadiusPx,
+                    center = Offset(screenCenterX, screenCenterY),
+                    style = Stroke(width = 3.dp.toPx())
+                )
+
+                // Concentric 50m / 100m guide ring
+                val guideRadiusPx = (50.0 / mpp).toFloat() * subZoom
+                drawCircle(
+                    color = SafeGreen.copy(alpha = 0.35f),
+                    radius = guideRadiusPx,
+                    center = Offset(screenCenterX, screenCenterY),
+                    style = Stroke(
+                        width = 1.5.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    )
+                )
+            }
 
             // Center: Facility Building Core Marker
             drawCircle(

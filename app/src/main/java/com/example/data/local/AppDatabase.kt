@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 @Database(
     entities = [Resident::class, FacilityZone::class, AlertEvent::class],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,40 +36,22 @@ abstract class AppDatabase : RoomDatabase() {
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
-                            // Populate initial facility zone & default sample resident
                             CoroutineScope(Dispatchers.IO).launch {
                                 val database = getInstance(context)
                                 database.facilityZoneDao().insertOrUpdate(
                                     FacilityZone(
                                         id = 1,
-                                        name = "MAS l'Épeau",
-                                        centerLatitude = 48.856614,
-                                        centerLongitude = 2.3522219,
+                                        name = "MAS l'Épeau (Bouguenais)",
+                                        address = "1 rue Urbain le Verrier, 44340 Bouguenais",
+                                        centerLatitude = 47.1787,
+                                        centerLongitude = -1.6192,
                                         radiusMeters = 150.0,
                                         isZoneActive = true,
+                                        zoneType = "CIRCLE",
+                                        polygonPointsJson = "",
                                         soundAlertsEnabled = true,
                                         vibrateAlertsEnabled = true,
                                         refreshIntervalSeconds = 15
-                                    )
-                                )
-                                database.residentDao().insertResident(
-                                    Resident(
-                                        name = "Michel Dupont",
-                                        roomNumber = "Chambre 12 - RDC",
-                                        avatarColorHex = "#1E88E5",
-                                        weenectUsername = "famille.dupont@email.com",
-                                        trackerId = 104281,
-                                        trackerName = "Balise Weenect Michel",
-                                        lastLatitude = 48.856800,
-                                        lastLongitude = 2.352400,
-                                        lastBattery = 92,
-                                        lastSpeed = 0.8,
-                                        lastUpdatedTime = System.currentTimeMillis() - 45000,
-                                        isInZone = true,
-                                        distanceFromCenterMeters = 24.5,
-                                        emergencyContact = "Poste Soins: 01 44 20 00 12",
-                                        notes = "Résident à mobilité réduite, porteur de la balise en pendentif.",
-                                        isTrackingActive = true
                                     )
                                 )
                             }

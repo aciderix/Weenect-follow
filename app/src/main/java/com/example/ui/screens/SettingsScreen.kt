@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
@@ -70,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.service.ResidentMonitoringService
 import com.example.data.remote.SupabaseSyncService
+import com.example.ui.components.VisualZonePickerDialog
 import com.example.ui.components.ZoneEditorDialog
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.SafeGreen
@@ -88,6 +90,7 @@ fun SettingsScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var showZoneEditor by remember { mutableStateOf(false) }
+    var showVisualMapPicker by remember { mutableStateOf(false) }
     var isTestingSupabase by remember { mutableStateOf(false) }
     var supabaseStatusMessage by remember { mutableStateOf<String?>(null) }
 
@@ -147,14 +150,35 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Button(
-                        onClick = { showZoneEditor = true },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("settings_edit_zone_button")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Modifier le périmètre de sécurité")
+                        Button(
+                            onClick = { showVisualMapPicker = true },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SafeNavy,
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier
+                                .weight(1.3f)
+                                .testTag("settings_visual_map_button")
+                        ) {
+                            Icon(Icons.Default.Map, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("🎯 Tracer la zone", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { showZoneEditor = true },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("settings_edit_zone_button")
+                        ) {
+                            Text("Modifier détails", fontSize = 13.sp)
+                        }
                     }
                 }
             }
@@ -443,7 +467,21 @@ fun SettingsScreen(
                 viewModel.updateFacilityZone(it)
                 showZoneEditor = false
             },
-            onUseCurrentLocation = {}
+            onOpenVisualMapPicker = {
+                showZoneEditor = false
+                showVisualMapPicker = true
+            }
+        )
+    }
+
+    if (showVisualMapPicker) {
+        VisualZonePickerDialog(
+            currentZone = facilityZone,
+            onDismiss = { showVisualMapPicker = false },
+            onZoneSaved = { updatedZone ->
+                viewModel.updateFacilityZone(updatedZone)
+                showVisualMapPicker = false
+            }
         )
     }
 }

@@ -69,6 +69,7 @@ import com.example.data.model.Resident
 import com.example.ui.components.AddResidentDialog
 import com.example.ui.components.AlertBanner
 import com.example.ui.components.ResidentCard
+import com.example.ui.components.VisualZonePickerDialog
 import com.example.ui.components.ZoneEditorDialog
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.SafeGreen
@@ -98,6 +99,7 @@ fun DashboardScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var residentToEdit by remember { mutableStateOf<Resident?>(null) }
     var showZoneEditor by remember { mutableStateOf(false) }
+    var showVisualMapPicker by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
     var currentFilter by remember { mutableStateOf(ResidentFilter.ALL) }
@@ -245,53 +247,136 @@ fun DashboardScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // 1. Titre et statut sur toute la largeur
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Surveillance de l'établissement",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                                Text(
-                                    text = "Zone définie : cercle de ${facilityZone.radiusMeters.toInt()}m",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(SafeNavy.copy(alpha = 0.1f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Apartment, contentDescription = null, tint = SafeNavy, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = facilityZone.name,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = facilityZone.address.ifBlank { "1 rue Urbain le Verrier, Bouguenais" },
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                OutlinedButton(
-                                    onClick = { showZoneEditor = true },
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.testTag("btn_configure_zone")
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = SafeGreen.copy(alpha = 0.15f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Box(modifier = Modifier.size(6.dp).background(SafeGreen, CircleShape))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Régler", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                ElevatedButton(
-                                    onClick = { onNavigateToMap(null) },
-                                    colors = ButtonDefaults.elevatedButtonColors(
-                                        containerColor = SafeNavy,
-                                        contentColor = Color.White
-                                    ),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.testTag("btn_quick_open_map")
-                                ) {
-                                    Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Carte", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Active 24h/24", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SafeGreen)
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        // 2. Info sur la zone (Polygone ou Cercle)
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val isPolygon = facilityZone.zoneType == "POLYGON" && facilityZone.getPolygonPoints().size >= 3
+                                val zoneDesc = if (isPolygon) {
+                                    "📐 Zone personnalisée : Limites du parc tracées (${facilityZone.getPolygonPoints().size} bornes)"
+                                } else {
+                                    "⚪ Zone circulaire : Rayon de ${facilityZone.radiusMeters.toInt()} mètres"
+                                }
+                                Text(
+                                    text = zoneDesc,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        // 3. Rangée de boutons d'action équilibrée sur toute la largeur
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { showVisualMapPicker = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SafeNavy,
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1.3f)
+                                    .testTag("btn_visual_map_zone")
+                            ) {
+                                Icon(Icons.Default.Map, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "🎯 Tracer zone",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = { showZoneEditor = true },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("btn_configure_zone")
+                            ) {
+                                Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Régler", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            ElevatedButton(
+                                onClick = { onNavigateToMap(null) },
+                                colors = ButtonDefaults.elevatedButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("btn_quick_open_map")
+                            ) {
+                                Text("Radar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
 
                         Surface(
                             shape = RoundedCornerShape(8.dp),
@@ -561,7 +646,21 @@ fun DashboardScreen(
                 viewModel.updateFacilityZone(it)
                 showZoneEditor = false
             },
-            onUseCurrentLocation = {}
+            onOpenVisualMapPicker = {
+                showZoneEditor = false
+                showVisualMapPicker = true
+            }
+        )
+    }
+
+    if (showVisualMapPicker) {
+        VisualZonePickerDialog(
+            currentZone = facilityZone,
+            onDismiss = { showVisualMapPicker = false },
+            onZoneSaved = { updatedZone ->
+                viewModel.updateFacilityZone(updatedZone)
+                showVisualMapPicker = false
+            }
         )
     }
 }

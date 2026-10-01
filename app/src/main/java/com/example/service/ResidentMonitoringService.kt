@@ -17,10 +17,12 @@ import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.SecuriResidentApp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -75,13 +77,19 @@ class ResidentMonitoringService : Service() {
             while (isActive) {
                 try {
                     doMonitoringCycle()
+                } catch (e: CancellationException) {
+                    break
                 } catch (e: Exception) {
                     Log.e("ResidentMonitoring", "Erreur lors du cycle de surveillance: ${e.message}")
                 }
 
                 val zone = app.database.facilityZoneDao().getFacilityZoneOnce()
                 val intervalSec = (zone?.refreshIntervalSeconds ?: 15).coerceAtLeast(10)
-                delay(intervalSec * 1000L)
+                try {
+                    delay(intervalSec * 1000L)
+                } catch (e: CancellationException) {
+                    break
+                }
             }
         }
     }
@@ -110,6 +118,8 @@ class ResidentMonitoringService : Service() {
                             outsideCount++
                         }
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.w("ResidentMonitoring", "Sync failed for ${resident.name}: ${e.message}")
                 }
@@ -184,6 +194,7 @@ class ResidentMonitoringService : Service() {
 
     override fun onDestroy() {
         monitoringJob?.cancel()
+        serviceScope.cancel()
         if (wakeLock?.isHeld == true) {
             wakeLock?.release()
         }

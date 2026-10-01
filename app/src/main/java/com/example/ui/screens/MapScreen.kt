@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ButtonDefaults
@@ -45,6 +46,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -55,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Resident
 import com.example.ui.components.InteractiveCompassMap
+import com.example.ui.components.VisualZonePickerDialog
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.SafeGreen
 import com.example.ui.theme.SafeNavy
@@ -72,6 +77,8 @@ fun MapScreen(
     val residents by viewModel.residents.collectAsState()
     val facilityZone by viewModel.facilityZone.collectAsState()
     val selectedResident by viewModel.selectedResident.collectAsState()
+
+    var showVisualZonePicker by remember { mutableStateOf(false) }
 
     val currentFocusedResident = selectedResident ?: residents.find { !it.isInZone } ?: residents.firstOrNull()
 
@@ -109,6 +116,9 @@ fun MapScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showVisualZonePicker = true }) {
+                        Icon(Icons.Default.Tune, contentDescription = "Régler la zone sur carte", tint = Color.White)
+                    }
                     IconButton(onClick = { viewModel.refreshAllPositions() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Actualiser positions", tint = Color.White)
                     }
@@ -321,5 +331,16 @@ fun MapScreen(
                 }
             }
         }
+    }
+
+    if (showVisualZonePicker) {
+        VisualZonePickerDialog(
+            currentZone = facilityZone,
+            onDismiss = { showVisualZonePicker = false },
+            onZoneSaved = { updatedZone ->
+                viewModel.updateFacilityZone(updatedZone)
+                showVisualZonePicker = false
+            }
+        )
     }
 }

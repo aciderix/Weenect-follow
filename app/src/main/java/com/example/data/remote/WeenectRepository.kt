@@ -135,11 +135,15 @@ class WeenectRepository(
                         val battery = latestPos.battery ?: resident.lastBattery ?: 100
                         val speed = latestPos.speed ?: 0.0
 
-                        val distance = GeoUtils.calculateDistanceMeters(
-                            lat, lon,
-                            zone.centerLatitude, zone.centerLongitude
-                        )
-                        val inZone = !zone.isZoneActive || distance <= zone.radiusMeters
+                        val (inZone, distance) = if (zone.zoneType == "POLYGON" && zone.getPolygonPoints().size >= 3) {
+                            val polygon = zone.getPolygonPoints()
+                            val inside = GeoUtils.isPointInPolygon(lat, lon, polygon)
+                            val dist = if (inside) 0.0 else GeoUtils.distanceToPolygonBoundaryMeters(lat, lon, polygon)
+                            Pair(!zone.isZoneActive || inside, dist)
+                        } else {
+                            val dist = GeoUtils.calculateDistanceMeters(lat, lon, zone.centerLatitude, zone.centerLongitude)
+                            Pair(!zone.isZoneActive || dist <= zone.radiusMeters, dist)
+                        }
 
                         checkAndFireAlerts(resident, inZone, distance, lat, lon)
 
@@ -156,6 +160,8 @@ class WeenectRepository(
                         return@withContext Result.success(updated)
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w("WeenectRepository", "Live sync failed, will keep current position: ${e.message}")
             }
@@ -165,11 +171,15 @@ class WeenectRepository(
         // On calcule la distance avec la dernière position connue
         val currentLat = resident.lastLatitude ?: zone.centerLatitude
         val currentLon = resident.lastLongitude ?: zone.centerLongitude
-        val distance = GeoUtils.calculateDistanceMeters(
-            currentLat, currentLon,
-            zone.centerLatitude, zone.centerLongitude
-        )
-        val inZone = !zone.isZoneActive || distance <= zone.radiusMeters
+        val (inZone, distance) = if (zone.zoneType == "POLYGON" && zone.getPolygonPoints().size >= 3) {
+            val polygon = zone.getPolygonPoints()
+            val inside = GeoUtils.isPointInPolygon(currentLat, currentLon, polygon)
+            val dist = if (inside) 0.0 else GeoUtils.distanceToPolygonBoundaryMeters(currentLat, currentLon, polygon)
+            Pair(!zone.isZoneActive || inside, dist)
+        } else {
+            val dist = GeoUtils.calculateDistanceMeters(currentLat, currentLon, zone.centerLatitude, zone.centerLongitude)
+            Pair(!zone.isZoneActive || dist <= zone.radiusMeters, dist)
+        }
 
         checkAndFireAlerts(resident, inZone, distance, currentLat, currentLon)
 
