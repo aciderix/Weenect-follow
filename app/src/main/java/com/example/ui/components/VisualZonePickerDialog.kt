@@ -19,13 +19,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -378,7 +383,8 @@ fun VisualZonePickerDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopCenter)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .statusBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     // Carte recherche d'adresse
@@ -586,14 +592,18 @@ fun VisualZonePickerDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .padding(12.dp),
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (selectedMode == 0) {
                             // Configuration Mode Cercle
@@ -692,44 +702,62 @@ fun VisualZonePickerDialog(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
 
                         // Bouton principal de validation
+                        val isPolygonMode = selectedMode == 1
+                        val hasEnoughPoints = polygonPoints.size >= 3
+
                         Button(
                             onClick = {
-                                val isPolygon = selectedMode == 1 && polygonPoints.size >= 3
-                                val finalCenter = if (isPolygon) {
-                                    GeoUtils.calculatePolygonCenter(polygonPoints)
+                                if (isPolygonMode) {
+                                    if (!hasEnoughPoints) {
+                                        Toast.makeText(
+                                            context,
+                                            "Pour valider le tracé du parc, placez au moins 3 bornes avec le bouton vert (${polygonPoints.size}/3 actuellement)",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        return@Button
+                                    }
+                                    val finalCenter = GeoUtils.calculatePolygonCenter(polygonPoints)
+                                    val updated = currentZone.copy(
+                                        name = currentZone.name.ifBlank { "MAS l'Épeau (Bouguenais)" },
+                                        address = searchQuery.ifBlank { currentZone.address },
+                                        centerLatitude = finalCenter.first,
+                                        centerLongitude = finalCenter.second,
+                                        radiusMeters = radiusMeters.toDouble(),
+                                        zoneType = "POLYGON",
+                                        polygonPointsJson = FacilityZone.encodePolygonPoints(polygonPoints)
+                                    )
+                                    onZoneSaved(updated)
                                 } else {
-                                    Pair(targetedLat, targetedLon)
+                                    val updated = currentZone.copy(
+                                        name = currentZone.name.ifBlank { "MAS l'Épeau (Bouguenais)" },
+                                        address = searchQuery.ifBlank { currentZone.address },
+                                        centerLatitude = targetedLat,
+                                        centerLongitude = targetedLon,
+                                        radiusMeters = radiusMeters.toDouble(),
+                                        zoneType = "CIRCLE",
+                                        polygonPointsJson = ""
+                                    )
+                                    onZoneSaved(updated)
                                 }
-
-                                val updated = currentZone.copy(
-                                    name = currentZone.name.ifBlank { "MAS l'Épeau (Bouguenais)" },
-                                    address = searchQuery.ifBlank { currentZone.address },
-                                    centerLatitude = finalCenter.first,
-                                    centerLongitude = finalCenter.second,
-                                    radiusMeters = radiusMeters.toDouble(),
-                                    zoneType = if (isPolygon) "POLYGON" else "CIRCLE",
-                                    polygonPointsJson = if (isPolygon) FacilityZone.encodePolygonPoints(polygonPoints) else ""
-                                )
-                                onZoneSaved(updated)
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = SafeNavy,
+                                containerColor = if (isPolygonMode && !hasEnoughPoints) SafeNavy.copy(alpha = 0.85f) else SafeNavy,
                                 contentColor = Color.White
                             ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(50.dp)
+                                .height(48.dp)
                         ) {
                             Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            val label = if (selectedMode == 1 && polygonPoints.size >= 3) {
-                                "Valider le polygone du parc (${polygonPoints.size} bornes)"
-                            } else {
-                                "Valider la zone circulaire (${radiusMeters.toInt()}m)"
+                            val label = when {
+                                isPolygonMode && hasEnoughPoints -> "Valider le tracé du parc (${polygonPoints.size} bornes)"
+                                isPolygonMode -> "Tracé du parc : min. 3 bornes (${polygonPoints.size}/3)"
+                                else -> "Valider la zone circulaire (${radiusMeters.toInt()}m)"
                             }
                             Text(
                                 text = label,
