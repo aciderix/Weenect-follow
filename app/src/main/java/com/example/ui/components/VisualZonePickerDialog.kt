@@ -655,12 +655,21 @@ fun VisualZonePickerDialog(
                     }
                 }
 
+                // Calcul précis de la hauteur de la barre de navigation système Android
+                val navBarResourceId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+                val systemNavBarHeight = if (navBarResourceId > 0) {
+                    (context.resources.getDimensionPixelSize(navBarResourceId) / context.resources.displayMetrics.density).dp
+                } else {
+                    56.dp
+                }
+                val bottomCardPadding = maxOf(systemNavBarHeight, 56.dp) + 16.dp
+
                 // 4. Panneau inférieur de configuration
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 28.dp),
+                        .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = bottomCardPadding),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
