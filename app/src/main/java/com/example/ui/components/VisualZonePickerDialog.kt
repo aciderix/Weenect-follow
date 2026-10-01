@@ -235,6 +235,43 @@ fun VisualZonePickerDialog(
                 val metersPerPx = MapTileProvider.metersPerPixel(targetedLat, zoomLevel)
                 val radiusPx = (radiusMeters / metersPerPx).toFloat() * subZoom
 
+                fun validateAndSaveZone() {
+                    val isPolygonMode = selectedMode == 1
+                    val hasEnoughPoints = polygonPoints.size >= 3
+                    if (isPolygonMode) {
+                        if (!hasEnoughPoints) {
+                            Toast.makeText(
+                                context,
+                                "Pour valider le tracé du parc, placez au moins 3 bornes avec le bouton vert (${polygonPoints.size}/3 actuellement)",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return
+                        }
+                        val finalCenter = GeoUtils.calculatePolygonCenter(polygonPoints)
+                        val updated = currentZone.copy(
+                            name = currentZone.name.ifBlank { "MAS l'Épeau (Bouguenais)" },
+                            address = searchQuery.ifBlank { currentZone.address },
+                            centerLatitude = finalCenter.first,
+                            centerLongitude = finalCenter.second,
+                            radiusMeters = radiusMeters.toDouble(),
+                            zoneType = "POLYGON",
+                            polygonPointsJson = FacilityZone.encodePolygonPoints(polygonPoints)
+                        )
+                        onZoneSaved(updated)
+                    } else {
+                        val updated = currentZone.copy(
+                            name = currentZone.name.ifBlank { "MAS l'Épeau (Bouguenais)" },
+                            address = searchQuery.ifBlank { currentZone.address },
+                            centerLatitude = targetedLat,
+                            centerLongitude = targetedLon,
+                            radiusMeters = radiusMeters.toDouble(),
+                            zoneType = "CIRCLE",
+                            polygonPointsJson = ""
+                        )
+                        onZoneSaved(updated)
+                    }
+                }
+
                 // 1. Fond de Carte OpenStreetMap + Dessin Cercle ou Polygone
                 Box(modifier = Modifier.fillMaxSize()) {
                     Canvas(
@@ -445,7 +482,24 @@ fun VisualZonePickerDialog(
                                     )
                                 )
 
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                Button(
+                                    onClick = { validateAndSaveZone() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = SafeNavy,
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                    modifier = Modifier.height(42.dp)
+                                ) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Valider", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+
+                                Spacer(modifier = Modifier.width(2.dp))
 
                                 IconButton(onClick = onDismiss) {
                                     Icon(Icons.Default.Close, contentDescription = "Fermer")
@@ -497,17 +551,31 @@ fun VisualZonePickerDialog(
                             TabRow(
                                 selectedTabIndex = selectedMode,
                                 containerColor = Color.Transparent,
-                                contentColor = SafeNavy
+                                contentColor = Color.White
                             ) {
                                 Tab(
                                     selected = selectedMode == 0,
                                     onClick = { selectedMode = 0 },
-                                    text = { Text("⚪ Cercle (Rayon)", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                                    text = {
+                                        Text(
+                                            "⚪ Cercle (Rayon)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (selectedMode == 0) Color.White else Color.White.copy(alpha = 0.65f)
+                                        )
+                                    }
                                 )
                                 Tab(
                                     selected = selectedMode == 1,
                                     onClick = { selectedMode = 1 },
-                                    text = { Text("📐 Polygone (Parc)", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                                    text = {
+                                        Text(
+                                            "📐 Polygone (Parc)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (selectedMode == 1) Color.White else Color.White.copy(alpha = 0.65f)
+                                        )
+                                    }
                                 )
                             }
                         }
@@ -592,17 +660,14 @@ fun VisualZonePickerDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .imePadding()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 28.dp),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
                     Column(
                         modifier = Modifier
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                            .verticalScroll(rememberScrollState()),
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (selectedMode == 0) {
@@ -652,6 +717,27 @@ fun VisualZonePickerDialog(
                                     )
                                 }
                             }
+
+                            Button(
+                                onClick = { validateAndSaveZone() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SafeNavy,
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(46.dp)
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Valider la zone circulaire (${radiusMeters.toInt()}m)",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
                         } else {
                             // Configuration Mode Polygone (Tracé du parc)
                             Row(
@@ -687,84 +773,48 @@ fun VisualZonePickerDialog(
                                 }
                             }
 
-                            Button(
-                                onClick = {
-                                    polygonPoints.add(Pair(targetedLat, targetedLon))
-                                    Toast.makeText(context, "Borne ${polygonPoints.size} ajoutée", Toast.LENGTH_SHORT).show()
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = SafeGreen),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
+                            // Rangée compacte avec "+ Borne" et "Valider" côte à côte !
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Placer une borne sous le réticule 🎯", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        // Bouton principal de validation
-                        val isPolygonMode = selectedMode == 1
-                        val hasEnoughPoints = polygonPoints.size >= 3
-
-                        Button(
-                            onClick = {
-                                if (isPolygonMode) {
-                                    if (!hasEnoughPoints) {
-                                        Toast.makeText(
-                                            context,
-                                            "Pour valider le tracé du parc, placez au moins 3 bornes avec le bouton vert (${polygonPoints.size}/3 actuellement)",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                        return@Button
-                                    }
-                                    val finalCenter = GeoUtils.calculatePolygonCenter(polygonPoints)
-                                    val updated = currentZone.copy(
-                                        name = currentZone.name.ifBlank { "MAS l'Épeau (Bouguenais)" },
-                                        address = searchQuery.ifBlank { currentZone.address },
-                                        centerLatitude = finalCenter.first,
-                                        centerLongitude = finalCenter.second,
-                                        radiusMeters = radiusMeters.toDouble(),
-                                        zoneType = "POLYGON",
-                                        polygonPointsJson = FacilityZone.encodePolygonPoints(polygonPoints)
-                                    )
-                                    onZoneSaved(updated)
-                                } else {
-                                    val updated = currentZone.copy(
-                                        name = currentZone.name.ifBlank { "MAS l'Épeau (Bouguenais)" },
-                                        address = searchQuery.ifBlank { currentZone.address },
-                                        centerLatitude = targetedLat,
-                                        centerLongitude = targetedLon,
-                                        radiusMeters = radiusMeters.toDouble(),
-                                        zoneType = "CIRCLE",
-                                        polygonPointsJson = ""
-                                    )
-                                    onZoneSaved(updated)
+                                Button(
+                                    onClick = {
+                                        polygonPoints.add(Pair(targetedLat, targetedLon))
+                                        Toast.makeText(context, "Borne ${polygonPoints.size} ajoutée", Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SafeGreen, contentColor = Color.White),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .weight(1.1f)
+                                        .height(48.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("+ Borne 🎯", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
                                 }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isPolygonMode && !hasEnoughPoints) SafeNavy.copy(alpha = 0.85f) else SafeNavy,
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            val label = when {
-                                isPolygonMode && hasEnoughPoints -> "Valider le tracé du parc (${polygonPoints.size} bornes)"
-                                isPolygonMode -> "Tracé du parc : min. 3 bornes (${polygonPoints.size}/3)"
-                                else -> "Valider la zone circulaire (${radiusMeters.toInt()}m)"
+
+                                Button(
+                                    onClick = { validateAndSaveZone() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (polygonPoints.size >= 3) SafeNavy else Color(0xFF334E68),
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .weight(1.3f)
+                                        .height(48.dp)
+                                ) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    val label = if (polygonPoints.size >= 3) {
+                                        "Valider (${polygonPoints.size} bornes)"
+                                    } else {
+                                        "Valider (${polygonPoints.size}/3 min)"
+                                    }
+                                    Text(label, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                }
                             }
-                            Text(
-                                text = label,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
                         }
                     }
                 }
