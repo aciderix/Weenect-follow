@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.graphics.toAwtImage
@@ -60,6 +61,11 @@ class AppContentUiTest {
         onNodeWithTag("nav_Paramètres").performClick()
         waitForIdle()
         assertTextShown("Windows")
+        assertTextShown("Partage entre appareils")
+        assertTextShown("Non configuré")
+        onAllNodesWithText("Connecter à Supabase", useUnmergedTree = true)[0].performScrollTo()
+        waitForIdle()
+        screenshot("partage") { onRoot().captureToImage().toAwtImage() }
         screenshot("parametres") { onRoot().captureToImage().toAwtImage() }
     }
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.LocationOn
@@ -63,6 +64,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.alerteresidents.ui.components.CloudSyncSection
 import fr.alerteresidents.ui.components.ConfigSyncDialog
 import fr.alerteresidents.ui.components.SetPinDialog
 import fr.alerteresidents.ui.components.DesktopZoneEditor
@@ -211,6 +213,10 @@ fun SettingsScreen(viewModel: ResidentViewModel, onOpenStatus: () -> Unit, modif
                     onClick = { showBackupDialog = true },
                     modifier = Modifier.fillMaxWidth().testTag("open_backup_dialog_button")
                 ) { Text("Exporter ou importer la configuration") }
+            }
+
+            SettingsCard(Icons.Default.Cloud, "Partage entre appareils", "Alertes et prises en charge communes (Supabase)") {
+                CloudSyncSection(viewModel)
             }
 
             SettingsCard(Icons.Default.Computer, "Windows", "Démarrage et données du poste") {

@@ -97,6 +97,9 @@ fun AlarmDialog(
                                             fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
+                                    alarm.reportedBy?.let {
+                                        Text("Signalé par : $it", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {

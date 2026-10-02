@@ -77,11 +77,12 @@ class SoundAlertManager(
         resident: Resident,
         zone: FacilityZone,
         isDrill: Boolean = false,
-        isReminder: Boolean = false
+        isReminder: Boolean = false,
+        reportedBy: String? = null
     ) {
         val startSound: Boolean
         synchronized(lock) {
-            val info = AlarmInfo(resident.id, resident.name, isDrill, isReminder, System.currentTimeMillis())
+            val info = AlarmInfo(resident.id, resident.name, isDrill, isReminder, System.currentTimeMillis(), reportedBy)
             _activeAlarms.value = _activeAlarms.value + (resident.id to info)
             startSound = !soundPlaying
             soundPlaying = true

@@ -6,5 +6,7 @@ data class AlarmInfo(
     val residentName: String,
     val isDrill: Boolean,
     val isReminder: Boolean,
-    val startedAt: Long
+    val startedAt: Long,
+    /** Alarme déclenchée par un autre appareil (nom du poste), null si détectée ici. */
+    val reportedBy: String? = null
 )

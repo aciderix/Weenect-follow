@@ -1,0 +1,55 @@
+name: Supabase keepalive
+
+# Les projets Supabase gratuits sont mis en pause après 7 jours sans activité.
+# Cette action appelle 4 fois par jour la fonction public.keepalive() (voir supabase/migrations)
+# avec la clé publique du projet, enregistrée dans les secrets du dépôt :
+#   SUPABASE_URL       ex. https://abcd1234.supabase.co
+#   SUPABASE_ANON_KEY  clé « publishable » (sb_publishable_…) ou ancienne clé « anon »
+# Sans ces secrets, l'action ne fait rien (avertissement seulement).
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'  # 4 fois par jour (Supabase demande « quelques requêtes par jour »)
+  workflow_dispatch:
+
+permissions:
+  actions: write    # pour garder ce workflow planifié actif (voir dernière étape)
+  contents: read
+
+jobs:
+  ping:
+    name: Ping Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call public.keepalive()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Secrets SUPABASE_URL et SUPABASE_ANON_KEY absents : rien à faire (voir SUPABASE.md)."
+            exit 0
+          fi
+          url="${SUPABASE_URL%/}"
+          for attempt in 1 2 3; do
+            code=$(curl -sS -m 30 -o response.txt -w '%{http_code}' -X POST "$url/rest/v1/rpc/keepalive" \
+              -H "apikey: $SUPABASE_ANON_KEY" -H "Content-Type: application/json" -d '{}' || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "Supabase actif — dernier ping : $(cat response.txt)"
+              exit 0
+            fi
+            echo "Tentative $attempt : HTTP $code $(head -c 300 response.txt 2>/dev/null)"
+            sleep $((attempt * 20))
+          done
+          echo "::error::Supabase ne répond pas. Projet en pause ? Le réactiver dans le tableau de bord Supabase (Restore project)."
+          exit 1
+
+      # GitHub désactive les workflows planifiés d'un dépôt public après 60 jours sans activité.
+      # Réactiver le workflow (même déjà actif) remet ce compteur à zéro.
+      - name: Keep this scheduled workflow enabled
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/supabase-keepalive.yml/enable"

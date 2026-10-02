@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.alerteresidents.ui.components.CloudSyncSection
 import fr.alerteresidents.ui.components.ConfigSyncDialog
 import fr.alerteresidents.ui.components.SetPinDialog
 import fr.alerteresidents.ui.components.VisualZonePickerDialog
@@ -92,8 +93,6 @@ fun SettingsScreen(viewModel: ResidentViewModel, onOpenStatus: () -> Unit, modif
     var nameDraft by remember(staffName) { mutableStateOf(staffName) }
     var staleMinutes by remember { mutableFloatStateOf(viewModel.prefs.staleMinutes.toFloat()) }
     var reminderMinutes by remember { mutableFloatStateOf(viewModel.prefs.reminderMinutes.toFloat()) }
-    var isTestingSupabase by remember { mutableStateOf(false) }
-    var supabaseStatusMessage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -208,33 +207,8 @@ fun SettingsScreen(viewModel: ResidentViewModel, onOpenStatus: () -> Unit, modif
                 ) { Text("Exporter ou importer la configuration") }
             }
 
-            // Cloud Supabase (inchangé)
-            SettingsCard(Icons.Default.Cloud, "Partage Multi-Téléphones (Cloud)", "Synchronisation Infirmières & Chefs de service") {
-                Text("Connecté au projet Supabase de l'établissement :", fontSize = 14.sp)
-                Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text("https://iphngnvzdqmuibscmtjk.supabase.co", fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(8.dp))
-                }
-                FilledTonalButton(
-                    onClick = {
-                        isTestingSupabase = true
-                        supabaseStatusMessage = null
-                        scope.launch {
-                            val r = viewModel.testSupabase()
-                            isTestingSupabase = false
-                            supabaseStatusMessage = if (r.isSuccess) "Synchronisation active avec le serveur établissement"
-                            else "Erreur : ${r.exceptionOrNull()?.message}"
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (isTestingSupabase) CircularProgressIndicator(Modifier.size(16.dp))
-                    else {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Tester la liaison serveur Supabase")
-                    }
-                }
-                supabaseStatusMessage?.let { Text(it, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppStatusColors.safe) }
+            SettingsCard(Icons.Default.Cloud, "Partage entre appareils", "Alertes et prises en charge communes (Supabase)") {
+                CloudSyncSection(viewModel)
             }
 
             SettingsCard(null, "Guide rapide", null) {

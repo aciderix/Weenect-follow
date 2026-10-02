@@ -25,7 +25,7 @@ Au premier lancement, l'application s'inscrit pour **démarrer automatiquement �
 - la fenêtre passe **au premier plan, au-dessus des autres applications**, avec la fenêtre d'alarme (« Je m'en occupe », « Couper le son », « Guider ») ;
 - une notification Windows s'affiche ; l'icône de la zone de notification permet aussi de **couper l'alarme**.
 
-L'alarme du PC est indépendante de celle des téléphones : la couper sur le PC ne la coupe pas sur les téléphones (et inversement).
+« Couper le son » n'agit que sur ce PC. « Je m'en occupe » et « Retrouvé » sont partagés avec les autres appareils lorsque le partage Supabase est configuré.
 
 ## Reprendre la configuration du téléphone
 
@@ -40,10 +40,11 @@ Sur le PC : **Paramètres → Sauvegarde / import depuis le téléphone → Impo
 
 ## Déploiement sur plusieurs postes (infirmerie, cadres de santé…)
 
-- Installer le `.msi` sur chaque PC, puis importer sur chacun la même sauvegarde exportée depuis le téléphone (zone, résidents, comptes Weenect).
-- **Chaque poste surveille et sonne de façon indépendante** : quand un soignant clique « Je m'en occupe » sur un poste, les autres postes et les téléphones continuent de sonner jusqu'à ce qu'on les coupe aussi (pas de synchronisation entre appareils sans serveur commun).
-- Chaque poste interroge Weenect toutes les 15 s environ : avec beaucoup de postes, garder un œil sur l'écran **État** (erreurs de connexion Weenect).
-- Le proxy internet configuré dans Windows est utilisé automatiquement. Si le service informatique bloque les applications non signées, lui transmettre le `.msi` pour qu'il l'autorise.
+- Installer le `.msi` sur chaque PC.
+- **Recommandé : relier tous les appareils à un projet Supabase** (voir [SUPABASE.md](SUPABASE.md)). Une sortie détectée par un appareil sonne alors sur tous, et « Je m'en occupe » coupe l'alarme partout avec le nom du soignant. La configuration (zone, résidents, comptes) se récupère en un clic.
+- Sans Supabase, chaque poste surveille et sonne seul : il faut couper l'alarme sur chacun. La configuration se transmet alors par export/import de fichier depuis le téléphone.
+- Chaque poste interroge Weenect toutes les 15 s environ : avec beaucoup de postes, gardez un œil sur l'écran **État** (erreurs de connexion Weenect).
+- Le proxy internet configuré dans Windows est utilisé automatiquement. Si le service informatique bloque les applications non signées, transmettez-lui le `.msi` pour qu'il l'autorise.
 
 ## Données
 

@@ -1,6 +1,7 @@
 package fr.alerteresidents.ui.viewmodel
 
 import fr.alerteresidents.NavDestination
+import fr.alerteresidents.cloud.CloudState
 import fr.alerteresidents.data.model.AlertEvent
 import fr.alerteresidents.data.model.AlertType
 import fr.alerteresidents.data.model.FacilityZone
@@ -43,6 +44,9 @@ import java.util.Date
 import java.util.Locale
 
 /** Même rôle et même API que le ResidentViewModel Android, branché sur le stockage Windows. */
+/** Configuration publiée par un autre appareil, prête à être importée. */
+data class SharedConfigPreview(val data: BackupData, val publishedBy: String?, val publishedAt: Long?)
+
 class ResidentViewModel(private val app: DesktopApp) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -508,5 +512,43 @@ class ResidentViewModel(private val app: DesktopApp) {
         app.monitor.start()
         app.monitor.refreshNow()
         _operationMessage.value = "Surveillance relancée"
+    }
+
+    // ------------------------------------------------------------------ partage entre appareils (Supabase)
+
+    private val cloudSync = app.cloudSync
+    val cloud: StateFlow<CloudState> = cloudSync.state
+    val cloudDefaultDeviceName: String = DesktopApp.defaultDeviceName()
+
+    suspend fun connectCloud(url: String, key: String, email: String, password: String, deviceName: String): Result<String> =
+        cloudSync.connect(url, key, email, password, deviceName).onSuccess {
+            _operationMessage.value = "Partage activé : connecté en tant que $it"
+        }
+
+    fun disconnectCloud() {
+        viewModelScope.launch {
+            cloudSync.disconnect()
+            _operationMessage.value = "Partage désactivé sur ce poste"
+        }
+    }
+
+    fun setCloudDeviceName(name: String) = cloudSync.setDeviceName(name)
+
+    /** Publie la configuration de ce poste ; les mots de passe Weenect sont chiffrés par [passphrase]. */
+    suspend fun publishSharedConfig(passphrase: String, publishedBy: String): Result<Unit> {
+        val json = withContext(Dispatchers.Default) {
+            val accs = accounts.value.map { it to app.cipher.decrypt(it.encryptedPassword) }
+            BackupCodec.createBackupJson(facilityZone.value, residents.value, publishedBy, accs, passphrase, appName = "AlerteResidents-Windows")
+        }
+        return cloudSync.publishConfig(json, publishedBy).map { }.onSuccess {
+            _operationMessage.value = "Configuration publiée pour les autres appareils"
+        }
+    }
+
+    suspend fun fetchSharedConfig(): Result<SharedConfigPreview?> = cloudSync.fetchConfig().mapCatching { cfg ->
+        cfg?.let {
+            val data = BackupCodec.parseBackupJson(it.payload) ?: throw IllegalStateException("Configuration partagée illisible")
+            SharedConfigPreview(data, it.publishedBy, it.publishedAt)
+        }
     }
 }

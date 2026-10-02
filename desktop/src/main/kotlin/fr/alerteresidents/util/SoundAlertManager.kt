@@ -34,10 +34,16 @@ class SoundAlertManager(
     val isAlarmPlaying: Boolean get() = _activeAlarms.value.isNotEmpty()
     fun isRinging(residentId: Long) = _activeAlarms.value.containsKey(residentId)
 
-    fun playZoneExitAlarm(resident: Resident, zone: FacilityZone, isDrill: Boolean = false, isReminder: Boolean = false) {
+    fun playZoneExitAlarm(
+        resident: Resident,
+        zone: FacilityZone,
+        isDrill: Boolean = false,
+        isReminder: Boolean = false,
+        reportedBy: String? = null
+    ) {
         synchronized(lock) {
             _activeAlarms.value = _activeAlarms.value +
-                (resident.id to AlarmInfo(resident.id, resident.name, isDrill, isReminder, System.currentTimeMillis()))
+                (resident.id to AlarmInfo(resident.id, resident.name, isDrill, isReminder, System.currentTimeMillis(), reportedBy))
         }
         val prefix = when {
             isDrill -> "EXERCICE — "
@@ -46,7 +52,7 @@ class SoundAlertManager(
         }
         val dist = GeoUtils.formatDistance(resident.distanceFromCenterMeters)
         notifier.alert(
-            "${prefix}🚨 ${resident.name} HORS ZONE",
+            "${prefix}🚨 ${resident.name} HORS ZONE" + (reportedBy?.let { " (signalé par $it)" } ?: ""),
             (if (resident.hasPosition) "À $dist" + if (zone.isPolygon) " de la limite" else " du centre" else "") +
                 " • ${resident.roomNumber.ifBlank { "chambre non renseignée" }}"
         )

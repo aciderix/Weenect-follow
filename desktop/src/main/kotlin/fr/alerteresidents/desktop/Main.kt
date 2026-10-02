@@ -89,7 +89,7 @@ fun main(args: Array<String>) {
     val startMinimized = "--minimized" in args
     val app = DesktopApp()
     val viewModel = ResidentViewModel(app)
-    app.monitor.start()
+    app.start()
 
     application(exitProcessOnExit = true) {
         val trayState = rememberTrayState()

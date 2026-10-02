@@ -281,3 +281,9 @@ Android Lint : 0 erreur.
 # Application Windows
 
 Une version PC (poste fixe qui sonne, démarrage automatique avec Windows) est disponible dans le module `desktop/`. Elle partage la logique de surveillance avec l'app Android via le module `core/`. Installation et utilisation : voir [WINDOWS.md](WINDOWS.md).
+
+---
+
+# Partage entre appareils (Supabase)
+
+Points 15 et 46 de l'audit traités : l'ancien écran « Cloud » (adresse et clé codées en dur, simple test de connexion) est remplacé par un vrai partage de l'état d'alerte entre téléphones et PC, connectable à **n'importe quel** projet Supabase. Le schéma est versionné dans `supabase/migrations/` et toute la mise en place est décrite dans [SUPABASE.md](SUPABASE.md). L'action GitHub `supabase-keepalive.yml` évite la mise en pause des projets gratuits.

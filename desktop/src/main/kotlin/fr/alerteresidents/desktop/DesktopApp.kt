@@ -1,5 +1,7 @@
 package fr.alerteresidents.desktop
 
+import fr.alerteresidents.cloud.CloudAlarmPort
+import fr.alerteresidents.cloud.CloudSync
 import fr.alerteresidents.data.model.FacilityZone
 import fr.alerteresidents.data.model.Resident
 import fr.alerteresidents.data.remote.MonitoringListener
@@ -12,7 +14,9 @@ import fr.alerteresidents.desktop.platform.Platform
 import fr.alerteresidents.security.CredentialCipher
 import fr.alerteresidents.util.AppPreferences
 import fr.alerteresidents.util.DesktopNotifier
+import fr.alerteresidents.domain.MonitoringHealth
 import fr.alerteresidents.util.HttpClients
+import fr.alerteresidents.util.PropertiesStore
 import fr.alerteresidents.util.SoundAlertManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,7 +75,43 @@ class DesktopApp(
 
     val monitor = DesktopMonitor(store, repository) { notifier }
 
+    /** Partage de l'état d'alerte avec les autres appareils (projet Supabase de l'établissement). */
+    val cloudSync = CloudSync(
+        store = PropertiesStore(File(dataDir, "partage.properties")),
+        cipher = cipher,
+        residents = store,
+        zones = store,
+        repository = repository,
+        alarms = object : CloudAlarmPort {
+            override fun alarmStartedAt(residentId: Long) = alarms.activeAlarms.value[residentId]?.startedAt
+            override fun ring(resident: Resident, zone: FacilityZone, isDrill: Boolean, reportedBy: String?) =
+                alarms.playZoneExitAlarm(resident, zone, isDrill = isDrill, reportedBy = reportedBy)
+            override fun stop(residentId: Long) { alarms.stopAlarm(residentId) }
+            override fun info(title: String, message: String) = notifier.info(title, message)
+        },
+        platform = "windows",
+        appVersion = APP_VERSION,
+        defaultDeviceName = defaultDeviceName(),
+        staffName = { preferences.staffName.value.ifBlank { "Soignant" } },
+        monitoringOk = { !MonitoringHealth.state.value.isDegraded(System.currentTimeMillis()) }
+    )
+
+    /** Démarre la surveillance et le partage. */
+    fun start() {
+        monitor.start()
+        cloudSync.start(scope)
+    }
+
+    companion object {
+        const val APP_VERSION = "2.0.0"
+
+        fun defaultDeviceName(): String =
+            (System.getenv("COMPUTERNAME") ?: runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull())
+                ?.takeIf { it.isNotBlank() }?.let { "PC $it" } ?: "PC"
+    }
+
     init {
+        repository.sharedHooks = cloudSync
         HttpClients.userAgent = "AlerteResidents/2.0 (Windows)"
         if (!preferences.legacyCredentialsMigrated) {
             scope.launch {

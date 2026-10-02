@@ -1,6 +1,12 @@
 package fr.alerteresidents
 
 import android.app.Application
+import android.content.Context
+import android.os.Build
+import fr.alerteresidents.cloud.CloudAlarmPort
+import fr.alerteresidents.cloud.CloudSync
+import fr.alerteresidents.cloud.KeyValueStore
+import fr.alerteresidents.domain.MonitoringHealth
 import fr.alerteresidents.data.local.AppDatabase
 import fr.alerteresidents.data.model.FacilityZone
 import fr.alerteresidents.data.model.Resident
@@ -27,6 +33,10 @@ class SecuriResidentApp : Application() {
         private set
 
     lateinit var weenectRepository: WeenectRepository
+        private set
+
+    /** Partage de l'état d'alerte avec les autres appareils (projet Supabase de l'établissement). */
+    lateinit var cloudSync: CloudSync
         private set
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -68,6 +78,32 @@ class SecuriResidentApp : Application() {
                 override fun isAlarmRinging(residentId: Long) = soundAlertManager.isRinging(residentId)
             }
         )
+
+        val cloudPrefs = getSharedPreferences("cloud_prefs", Context.MODE_PRIVATE)
+        cloudSync = CloudSync(
+            store = object : KeyValueStore {
+                override fun get(key: String) = cloudPrefs.getString(key, null)
+                override fun put(key: String, value: String?) = cloudPrefs.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()
+            },
+            cipher = KeystoreCredentialCipher(),
+            residents = database.residentDao(),
+            zones = database.facilityZoneDao(),
+            repository = weenectRepository,
+            alarms = object : CloudAlarmPort {
+                override fun alarmStartedAt(residentId: Long) = soundAlertManager.activeAlarms.value[residentId]?.startedAt
+                override fun ring(resident: Resident, zone: FacilityZone, isDrill: Boolean, reportedBy: String?) =
+                    soundAlertManager.playZoneExitAlarm(resident, zone, isDrill = isDrill, reportedBy = reportedBy)
+                override fun stop(residentId: Long) { soundAlertManager.stopAlarm(residentId) }
+                override fun info(title: String, message: String) = notifications.showSharedInfo(title, message)
+            },
+            platform = "android",
+            appVersion = BuildConfig.VERSION_NAME,
+            defaultDeviceName = listOf(Build.MANUFACTURER, Build.MODEL).filter { !it.isNullOrBlank() }.joinToString(" ").ifBlank { "Téléphone" },
+            staffName = { preferences.staffName.value.ifBlank { "Soignant" } },
+            monitoringOk = { !MonitoringHealth.state.value.isDegraded(System.currentTimeMillis()) }
+        )
+        weenectRepository.sharedHooks = cloudSync
+        cloudSync.start(appScope)
 
         // Anciennes versions : identifiants Weenect en clair dans les fiches → comptes chiffrés.
         if (!preferences.legacyCredentialsMigrated) {

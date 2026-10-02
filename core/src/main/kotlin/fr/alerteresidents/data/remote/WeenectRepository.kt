@@ -47,6 +47,18 @@ interface MonitoringListener {
     fun isAlarmRinging(residentId: Long): Boolean = false
 }
 
+/**
+ * Changements d'état à partager avec les autres appareils (Supabase). Appelés uniquement pour
+ * les actions faites sur CET appareil, jamais pour les changements reçus d'un autre appareil.
+ */
+interface SharedStateHooks {
+    fun exitConfirmed(resident: Resident, isDrill: Boolean) {}
+    /** [localAlert] = false : l'alarme venait d'un exercice ou d'un autre appareil (résident « dans la zone » ici). */
+    fun handling(resident: Resident, staff: String, localAlert: Boolean) {}
+    fun resolved(resident: Resident, staff: String, resolution: String, localAlert: Boolean) {}
+    fun pauseChanged(resident: Resident, untilMs: Long?, reason: String?, staff: String) {}
+}
+
 data class HistoryPoint(val latitude: Double, val longitude: Double, val time: Long?)
 
 class WeenectRepository(
@@ -65,9 +77,21 @@ class WeenectRepository(
         const val DEFAULT_BASE_URL = "https://apiv4.weenect.com/v4/"
         private const val TAG = "WeenectRepository"
         private const val BATTERY_RESET_MARGIN = 5
+        /** Auteur affiché quand c'est la balise qui confirme le retour. */
+        const val RETURN_BY_TRACKER = "Balise"
+    }
+
+    /** Motifs de clôture partagés (valeurs de la colonne incidents.resolution). */
+    object Resolution {
+        const val FOUND = "found"
+        const val RETURNED = "returned"
+        const val OUTING = "outing"
     }
 
     class WeenectException(message: String) : Exception(message)
+
+    /** Partage entre appareils (null = désactivé). */
+    @Volatile var sharedHooks: SharedStateHooks? = null
 
     private val logger = java.util.logging.Logger.getLogger(TAG)
 
@@ -311,10 +335,12 @@ class WeenectRepository(
             TransitionEvent.EXIT_CONFIRMED -> {
                 log(updated, AlertType.EXIT_ZONE, distance = eval.distanceMeters)
                 listener.onExitConfirmed(updated, zone, isDrill = false)
+                sharedHooks?.exitConfirmed(updated, isDrill = false)
             }
             TransitionEvent.RETURNED -> {
                 log(updated, AlertType.ENTER_ZONE, distance = eval.distanceMeters, acknowledged = true)
                 listener.onReturned(updated)
+                sharedHooks?.resolved(updated, RETURN_BY_TRACKER, Resolution.RETURNED, localAlert = true)
             }
             TransitionEvent.REMINDER -> listener.onReminder(updated, zone)
             TransitionEvent.EXIT_PENDING -> {
@@ -375,13 +401,16 @@ class WeenectRepository(
     // Actions des soignants (sous le même verrou que la synchro)
     // ------------------------------------------------------------------------------------------
 
-    /** « Je m'en occupe » : acquitte la sortie et arrête les rappels, sans toucher à la position. */
+    /**
+     * « Je m'en occupe » : acquitte la sortie et arrête les rappels, sans toucher à la position.
+     * Résident « dans la zone » ici (exercice ou alerte d'un autre appareil) : seul le partage est prévenu.
+     */
     suspend fun markHandling(residentId: Long, staff: String): Resident? = mutate(residentId) { r ->
-        if (r.isInZone) return@mutate null
-        val now = clock()
-        alertEventDao.acknowledgeForResident(r.id, AlertType.EXIT_ZONE, staff, now)
-        log(r, AlertType.HANDLING, acknowledged = true, by = staff, details = "Pris en charge par $staff")
-        r.copy(alertState = AlertState.HANDLING, alertHandledBy = staff, alertHandledAt = now)
+        if (r.isInZone) {
+            sharedHooks?.handling(r, staff, localAlert = false)
+            return@mutate null
+        }
+        applyHandling(r, staff, details = "Pris en charge par $staff").also { sharedHooks?.handling(it, staff, localAlert = true) }
     }
 
     /**
@@ -389,20 +418,53 @@ class WeenectRepository(
      * repasse « dans la zone » dès que la balise le confirme.
      */
     suspend fun markFound(residentId: Long, staff: String): Resident? = mutate(residentId) { r ->
-        if (r.isInZone) return@mutate null
-        val now = clock()
-        alertEventDao.acknowledgeForResident(r.id, AlertType.EXIT_ZONE, staff, now)
-        log(r, AlertType.RESOLVED, acknowledged = true, by = staff, details = "Retrouvé par $staff")
-        r.copy(alertState = AlertState.RESOLVED, alertHandledBy = staff, alertHandledAt = now)
+        if (r.isInZone) {
+            sharedHooks?.resolved(r, staff, Resolution.FOUND, localAlert = false)
+            return@mutate null
+        }
+        applyFound(r, staff, details = "Retrouvé par $staff").also { sharedHooks?.resolved(it, staff, Resolution.FOUND, localAlert = true) }
     }
 
     /** Sortie accompagnée : la surveillance de zone est suspendue jusqu'à [untilMs]. */
     suspend fun startOuting(residentId: Long, untilMs: Long, reason: String, staff: String): Resident? = mutate(residentId) { r ->
+        applyOuting(r, untilMs, reason, staff).also { sharedHooks?.pauseChanged(it, untilMs, reason.ifBlank { null }, staff) }
+    }
+
+    suspend fun endOuting(residentId: Long, staff: String): Resident? = mutate(residentId) { r ->
+        if (r.pausedUntil == null) return@mutate null
+        log(r, AlertType.OUTING_END, acknowledged = true, by = staff, details = "Fin de sortie — par $staff")
+        r.copy(pausedUntil = null, pauseReason = null).also { sharedHooks?.pauseChanged(it, null, null, staff) }
+    }
+
+    /** Exercice : déclenche l'alarme sans modifier le résident ; l'événement est marqué « exercice ». */
+    suspend fun simulateExit(residentId: Long) {
+        val r = residentDao.getResidentById(residentId) ?: return
+        val zone = facilityZoneDao.getFacilityZoneOnce() ?: FacilityZone()
+        log(r, AlertType.EXIT_ZONE, isDrill = true, details = "Exercice — simulation de sortie")
+        listener.onExitConfirmed(r, zone, isDrill = true)
+        sharedHooks?.exitConfirmed(r, isDrill = true)
+    }
+
+    private suspend fun applyHandling(r: Resident, staff: String, details: String): Resident {
+        val now = clock()
+        alertEventDao.acknowledgeForResident(r.id, AlertType.EXIT_ZONE, staff, now)
+        log(r, AlertType.HANDLING, acknowledged = true, by = staff, details = details)
+        return r.copy(alertState = AlertState.HANDLING, alertHandledBy = staff, alertHandledAt = now)
+    }
+
+    private suspend fun applyFound(r: Resident, staff: String, details: String): Resident {
+        val now = clock()
+        alertEventDao.acknowledgeForResident(r.id, AlertType.EXIT_ZONE, staff, now)
+        log(r, AlertType.RESOLVED, acknowledged = true, by = staff, details = details)
+        return r.copy(alertState = AlertState.RESOLVED, alertHandledBy = staff, alertHandledAt = now)
+    }
+
+    private suspend fun applyOuting(r: Resident, untilMs: Long, reason: String, staff: String): Resident {
         log(r, AlertType.OUTING_START, acknowledged = true, by = staff,
             details = "${reason.ifBlank { "Sortie accompagnée" }} — par $staff")
         val wasOut = !r.isInZone
         if (wasOut) alertEventDao.acknowledgeForResident(r.id, AlertType.EXIT_ZONE, staff, clock())
-        r.copy(
+        return r.copy(
             pausedUntil = untilMs,
             pauseReason = reason.ifBlank { null },
             isInZone = true,
@@ -415,18 +477,36 @@ class WeenectRepository(
         )
     }
 
-    suspend fun endOuting(residentId: Long, staff: String): Resident? = mutate(residentId) { r ->
-        if (r.pausedUntil == null) return@mutate null
-        log(r, AlertType.OUTING_END, acknowledged = true, by = staff, details = "Fin de sortie — par $staff")
-        r.copy(pausedUntil = null, pauseReason = null)
+    // ------------------------------------------------------------------------------------------
+    // Changements reçus d'un autre appareil (jamais renvoyés au partage)
+    // ------------------------------------------------------------------------------------------
+
+    /** Un soignant a pris en charge la sortie sur un autre appareil. */
+    suspend fun applyRemoteHandling(residentId: Long, staff: String, device: String?): Resident? = mutate(residentId) { r ->
+        if (r.isInZone || r.alertState != AlertState.ACTIVE) return@mutate null
+        applyHandling(r, staff, details = "Pris en charge par $staff" + (device?.let { " (sur $it)" } ?: ""))
     }
 
-    /** Exercice : déclenche l'alarme sans modifier le résident ; l'événement est marqué « exercice ». */
-    suspend fun simulateExit(residentId: Long) {
-        val r = residentDao.getResidentById(residentId) ?: return
-        val zone = facilityZoneDao.getFacilityZoneOnce() ?: FacilityZone()
-        log(r, AlertType.EXIT_ZONE, isDrill = true, details = "Exercice — simulation de sortie")
-        listener.onExitConfirmed(r, zone, isDrill = true)
+    /** L'alerte a été levée sur un autre appareil (retrouvé, ou retour confirmé par la balise). */
+    suspend fun applyRemoteResolved(residentId: Long, staff: String, resolution: String, device: String?): Resident? = mutate(residentId) { r ->
+        if (r.isInZone || r.alertState == AlertState.RESOLVED || r.alertState == AlertState.NONE) return@mutate null
+        val details = when (resolution) {
+            Resolution.RETURNED -> "Retour dans la zone confirmé par un autre appareil"
+            else -> "Retrouvé par $staff" + (device?.let { " (sur $it)" } ?: "")
+        }
+        applyFound(r, staff, details)
+    }
+
+    /** Sortie accompagnée commencée ([untilMs]) ou terminée (null) sur un autre appareil. */
+    suspend fun applyRemotePause(residentId: Long, untilMs: Long?, reason: String?, staff: String): Resident? = mutate(residentId) { r ->
+        if (untilMs == null) {
+            if (r.pausedUntil == null) return@mutate null
+            log(r, AlertType.OUTING_END, acknowledged = true, by = staff, details = "Fin de sortie — par $staff (autre appareil)")
+            r.copy(pausedUntil = null, pauseReason = null)
+        } else {
+            if (r.pausedUntil != null && kotlin.math.abs(r.pausedUntil!! - untilMs) < 1_000) return@mutate null
+            applyOuting(r, untilMs, reason.orEmpty(), staff)
+        }
     }
 
     private suspend fun mutate(residentId: Long, block: suspend (Resident) -> Resident?): Resident? =

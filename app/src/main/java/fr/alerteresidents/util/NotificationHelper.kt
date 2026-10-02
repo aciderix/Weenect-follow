@@ -198,6 +198,18 @@ class NotificationHelper(private val context: Context) {
         notificationManager.notify(INFO_OFFSET + (resident.id.hashCode() and 0xFFFF), notification)
     }
 
+    /** Information venant d'un autre appareil (prise en charge, alerte levée…). */
+    fun showSharedInfo(title: String, message: String) {
+        val notification = NotificationCompat.Builder(context, CHANNEL_INFO)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setAutoCancel(true)
+            .build()
+        notificationManager.notify(INFO_OFFSET + (title.hashCode() and 0xFFFF), notification)
+    }
+
     fun cancelWarning(residentId: Long, type: String) = notificationManager.cancel(warningId(residentId, type))
 
     private fun alertId(residentId: Long) = ALERT_OFFSET + (residentId.hashCode() and 0xFFFF)

@@ -63,6 +63,8 @@ import fr.alerteresidents.ui.components.statusDetail
 import fr.alerteresidents.ui.components.statusStyle
 import fr.alerteresidents.ui.theme.AppStatusColors
 import fr.alerteresidents.ui.theme.SafeNavy
+import fr.alerteresidents.ui.components.CloudDevicesList
+import fr.alerteresidents.ui.components.CloudStatusLine
 import fr.alerteresidents.ui.viewmodel.ResidentViewModel
 import fr.alerteresidents.util.AppPreferences
 
@@ -166,6 +168,13 @@ fun MonitoringStatusScreen(viewModel: ResidentViewModel, onBack: () -> Unit, mod
                         if (!check.ok && check.fix != null) TextButton(onClick = check.fix) { Text("Corriger") }
                     }
                 }
+            }
+
+            val cloud by viewModel.cloud.collectAsState()
+            SectionCard("Partage entre appareils") {
+                CloudStatusLine(cloud, now)
+                if (cloud.configured && cloud.devices.isNotEmpty()) CloudDevicesList(cloud, now)
+                if (!cloud.configured) Text("À configurer dans Paramètres › Partage entre appareils.", fontSize = 13.sp)
             }
 
             SectionCard("Balises (${residents.count { it.isTrackingActive }} suivies)") {

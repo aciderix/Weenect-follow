@@ -15,7 +15,6 @@ import fr.alerteresidents.data.model.ResidentProfile
 import fr.alerteresidents.data.model.WeenectAccount
 import fr.alerteresidents.data.model.WeenectTrackerDto
 import fr.alerteresidents.data.remote.HistoryPoint
-import fr.alerteresidents.data.remote.SupabaseSyncService
 import fr.alerteresidents.domain.HealthSnapshot
 import fr.alerteresidents.domain.MonitoringHealth
 import fr.alerteresidents.domain.ResidentStatus
@@ -24,6 +23,7 @@ import fr.alerteresidents.security.KeystoreCredentialCipher
 import fr.alerteresidents.service.ResidentMonitoringService
 import fr.alerteresidents.util.AlarmInfo
 import fr.alerteresidents.util.BackupData
+import fr.alerteresidents.cloud.CloudState
 import fr.alerteresidents.util.ConfigBackupManager
 import fr.alerteresidents.util.DashboardViewMode
 import fr.alerteresidents.util.JournalExporter
@@ -48,6 +48,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/** Configuration publiée par un autre appareil, prête à être importée. */
+data class SharedConfigPreview(val data: BackupData, val publishedBy: String?, val publishedAt: Long?)
+
 class ResidentViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as SecuriResidentApp
@@ -58,7 +61,6 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
     private val repo = app.weenectRepository
     private val alarms = app.soundAlertManager
     val prefs = app.preferences
-    private val supabaseService = SupabaseSyncService()
     private val cipher = KeystoreCredentialCipher()
 
     val residents: StateFlow<List<Resident>> = residentDao.getAllResidents()
@@ -552,9 +554,44 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // ------------------------------------------------------------------ Supabase (inchangé)
+    // ------------------------------------------------------------------ partage entre appareils (Supabase)
 
-    suspend fun testSupabase() = supabaseService.testConnection()
+    private val cloudSync = app.cloudSync
+    val cloud: StateFlow<CloudState> = cloudSync.state
+    val cloudDefaultDeviceName: String =
+        listOf(android.os.Build.MANUFACTURER, android.os.Build.MODEL).filter { !it.isNullOrBlank() }.joinToString(" ").ifBlank { "Téléphone" }
+
+    suspend fun connectCloud(url: String, key: String, email: String, password: String, deviceName: String): Result<String> =
+        cloudSync.connect(url, key, email, password, deviceName).onSuccess {
+            _operationMessage.value = "Partage activé : connecté en tant que $it"
+        }
+
+    fun disconnectCloud() {
+        viewModelScope.launch {
+            cloudSync.disconnect()
+            _operationMessage.value = "Partage désactivé sur cet appareil"
+        }
+    }
+
+    fun setCloudDeviceName(name: String) = cloudSync.setDeviceName(name)
+
+    /** Publie la configuration de cet appareil ; les mots de passe Weenect sont chiffrés par [passphrase]. */
+    suspend fun publishSharedConfig(passphrase: String, publishedBy: String): Result<Unit> {
+        val json = withContext(Dispatchers.Default) {
+            val accs = accountDao.getAllOnce().map { it to cipher.decrypt(it.encryptedPassword) }
+            ConfigBackupManager.createBackupJson(facilityZone.value, residentDao.getAllResidentsOnce(), publishedBy, accs, passphrase)
+        }
+        return cloudSync.publishConfig(json, publishedBy).map { }.onSuccess {
+            _operationMessage.value = "Configuration publiée pour les autres appareils"
+        }
+    }
+
+    suspend fun fetchSharedConfig(): Result<SharedConfigPreview?> = cloudSync.fetchConfig().mapCatching { cfg ->
+        cfg?.let {
+            val data = ConfigBackupManager.parseBackupJson(it.payload) ?: throw IllegalStateException("Configuration partagée illisible")
+            SharedConfigPreview(data, it.publishedBy, it.publishedAt)
+        }
+    }
 
     fun restartMonitoringService(context: Context) {
         ResidentMonitoringService.start(context)
