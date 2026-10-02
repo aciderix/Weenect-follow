@@ -33,6 +33,8 @@ class SecuriResidentApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        fr.alerteresidents.util.HttpClients.debugLogging = BuildConfig.DEBUG
+        fr.alerteresidents.util.HttpClients.userAgent = "AlerteResidents/2.0 (Android)"
         database = AppDatabase.getInstance(this)
         preferences = AppPreferences(this)
         soundAlertManager = SoundAlertManager(this, soundChoice = { preferences.alarmSound.value })

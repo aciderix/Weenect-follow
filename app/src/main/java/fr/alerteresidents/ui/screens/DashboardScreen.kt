@@ -434,11 +434,12 @@ private fun HealthHeader(
         health.errorCount > 0 -> Quad(c.warning, c.warningContainer, Icons.Default.Warning, "Surveillance partielle : ${health.errorCount} balise(s) en erreur")
         else -> Quad(c.safe, c.safeContainer, Icons.Default.CheckCircle, "Surveillance active" + if (health.nightMode) " (mode nuit)" else "")
     }
+    val lastCycleAt = health.lastCycleAt
     val subtitle = when {
         !health.serviceRunning -> "Le service de surveillance ne tourne pas. Touchez pour diagnostiquer."
-        health.lastCycleAt == null -> "Première vérification en cours…"
+        lastCycleAt == null -> "Première vérification en cours…"
         degraded && health.consecutiveFailedCycles > 0 -> "Aucune balise joignable depuis ${health.consecutiveFailedCycles} cycles. Touchez pour diagnostiquer."
-        else -> "Dernière vérification il y a ${formatDuration(now - health.lastCycleAt)} • toutes les ${health.nextIntervalSeconds} s"
+        else -> "Dernière vérification il y a ${formatDuration(now - lastCycleAt)} • toutes les ${health.nextIntervalSeconds} s"
     }
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).clickable(onClick = onClick).testTag("health_header"),

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="fr.alerteresidents.util.BackupCodecTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-02T17:52:19.223Z" hostname="vm" time="0.376">
+  <properties/>
+  <testcase name="export then import restores zone, residents and accounts without passwords" classname="fr.alerteresidents.util.BackupCodecTest" time="0.03"/>
+  <testcase name="passwords are exported encrypted with the passphrase" classname="fr.alerteresidents.util.BackupCodecTest" time="0.341"/>
+  <testcase name="invalid json or invalid zone is rejected" classname="fr.alerteresidents.util.BackupCodecTest" time="0.002"/>
+  <testcase name="missing optional fields fall back to defaults" classname="fr.alerteresidents.util.BackupCodecTest" time="0.001"/>
+  <testcase name="version 1 files with clear text credentials are still readable" classname="fr.alerteresidents.util.BackupCodecTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="fr.alerteresidents.security.PassphraseCryptoTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-02T17:52:17.480Z" hostname="vm" time="1.739">
+  <properties/>
+  <testcase name="wrong code or corrupted data gives null" classname="fr.alerteresidents.security.PassphraseCryptoTest" time="0.586"/>
+  <testcase name="same text encrypts differently each time" classname="fr.alerteresidents.security.PassphraseCryptoTest" time="0.303"/>
+  <testcase name="encrypt then decrypt with the right code" classname="fr.alerteresidents.security.PassphraseCryptoTest" time="0.36"/>
+  <testcase name="pin hash verification" classname="fr.alerteresidents.security.PassphraseCryptoTest" time="0.487"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

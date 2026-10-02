@@ -5,10 +5,11 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import fr.alerteresidents.data.model.AlertEvent
+import fr.alerteresidents.data.store.AlertStore
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface AlertEventDao {
+interface AlertEventDao : AlertStore {
     @Query("SELECT * FROM alert_events ORDER BY timestamp DESC")
     fun getAllAlerts(): Flow<List<AlertEvent>>
 
@@ -23,7 +24,7 @@ interface AlertEventDao {
     fun getUnacknowledgedAlerts(): Flow<List<AlertEvent>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAlert(alert: AlertEvent): Long
+    override suspend fun insertAlert(alert: AlertEvent): Long
 
     @Query("UPDATE alert_events SET isAcknowledged = 1, acknowledgedBy = :staffName, acknowledgedAt = :at WHERE id = :id")
     suspend fun acknowledgeAlert(id: Long, staffName: String, at: Long = System.currentTimeMillis())
@@ -32,7 +33,7 @@ interface AlertEventDao {
         "UPDATE alert_events SET isAcknowledged = 1, acknowledgedBy = :staffName, acknowledgedAt = :at " +
             "WHERE isAcknowledged = 0 AND residentId = :residentId AND alertType = :type"
     )
-    suspend fun acknowledgeForResident(residentId: Long, type: String, staffName: String, at: Long = System.currentTimeMillis())
+    override suspend fun acknowledgeForResident(residentId: Long, type: String, staffName: String, at: Long)
 
     @Query("UPDATE alert_events SET isAcknowledged = 1, acknowledgedBy = :staffName, acknowledgedAt = :at WHERE isAcknowledged = 0")
     suspend fun acknowledgeAllAlerts(staffName: String, at: Long = System.currentTimeMillis())

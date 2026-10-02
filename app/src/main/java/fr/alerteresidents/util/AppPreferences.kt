@@ -8,13 +8,6 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class DashboardViewMode { DETAILED, COMPACT, GRID }
 
-/** Son joué lors d'une alarme de sortie de zone. */
-enum class AlarmSound(val label: String, val description: String) {
-    SIREN("Sirène incendie (intégrée)", "Très forte, identique sur tous les téléphones"),
-    PHONE("Sonnerie d'alarme du téléphone", "Celle du réveil, réglée dans Android"),
-    BOTH("Les deux en même temps", "Sirène + sonnerie du téléphone")
-}
-
 /** Réglages locaux du téléphone (non liés à l'établissement, donc non exportés). */
 class AppPreferences(context: Context) {
     private val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
@@ -91,7 +84,7 @@ class AppPreferences(context: Context) {
 
     companion object {
         /** Seuil unique de batterie faible, utilisé partout dans l'app. */
-        const val LOW_BATTERY_THRESHOLD = 20
+        const val LOW_BATTERY_THRESHOLD = fr.alerteresidents.domain.Thresholds.LOW_BATTERY
 
         private const val KEY_STAFF = "staff_name"
         private const val KEY_VIEW = "dashboard_view"

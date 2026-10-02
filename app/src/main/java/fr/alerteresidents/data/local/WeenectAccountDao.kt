@@ -6,10 +6,11 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
 import fr.alerteresidents.data.model.WeenectAccount
+import fr.alerteresidents.data.store.AccountStore
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface WeenectAccountDao {
+interface WeenectAccountDao : AccountStore {
     @Query("SELECT * FROM weenect_accounts ORDER BY label ASC")
     fun getAll(): Flow<List<WeenectAccount>>
 
@@ -17,17 +18,17 @@ interface WeenectAccountDao {
     suspend fun getAllOnce(): List<WeenectAccount>
 
     @Query("SELECT * FROM weenect_accounts WHERE id = :id")
-    suspend fun getById(id: Long): WeenectAccount?
+    override suspend fun getById(id: Long): WeenectAccount?
 
     @Query("SELECT * FROM weenect_accounts WHERE username = :username LIMIT 1")
-    suspend fun findByUsername(username: String): WeenectAccount?
+    override suspend fun findByUsername(username: String): WeenectAccount?
 
     @Insert
-    suspend fun insert(account: WeenectAccount): Long
+    override suspend fun insert(account: WeenectAccount): Long
 
     @Update
-    suspend fun update(account: WeenectAccount)
+    override suspend fun update(account: WeenectAccount)
 
     @Delete
-    suspend fun delete(account: WeenectAccount)
+    override suspend fun delete(account: WeenectAccount)
 }

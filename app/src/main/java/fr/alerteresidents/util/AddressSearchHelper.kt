@@ -39,7 +39,7 @@ object AddressSearchHelper {
             val url = "https://api-adresse.data.gouv.fr/search/?q=$encodedQuery&limit=6"
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", HttpClients.USER_AGENT)
+                .header("User-Agent", HttpClients.userAgent)
                 .build()
 
             client.newCall(request).execute().use { response ->
@@ -90,7 +90,7 @@ object AddressSearchHelper {
                 val url = "https://nominatim.openstreetmap.org/search?q=$encodedQuery&format=json&limit=5&countrycodes=fr"
                 val request = Request.Builder()
                     .url(url)
-                    .header("User-Agent", HttpClients.USER_AGENT)
+                    .header("User-Agent", HttpClients.userAgent)
                     .build()
 
                 client.newCall(request).execute().use { response ->

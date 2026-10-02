@@ -9,18 +9,19 @@ import androidx.room.Update
 import fr.alerteresidents.data.model.Resident
 import fr.alerteresidents.data.model.ResidentProfile
 import fr.alerteresidents.data.model.ResidentTracking
+import fr.alerteresidents.data.store.ResidentStore
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface ResidentDao {
+interface ResidentDao : ResidentStore {
     @Query("SELECT * FROM residents ORDER BY name ASC")
     fun getAllResidents(): Flow<List<Resident>>
 
     @Query("SELECT * FROM residents ORDER BY name ASC")
-    suspend fun getAllResidentsOnce(): List<Resident>
+    override suspend fun getAllResidentsOnce(): List<Resident>
 
     @Query("SELECT * FROM residents WHERE id = :id")
-    suspend fun getResidentById(id: Long): Resident?
+    override suspend fun getResidentById(id: Long): Resident?
 
     @Query("SELECT * FROM residents WHERE isInZone = 0")
     fun getResidentsOutOfZone(): Flow<List<Resident>>
@@ -39,7 +40,7 @@ interface ResidentDao {
     suspend fun updateProfile(profile: ResidentProfile)
 
     @Update(entity = Resident::class)
-    suspend fun updateTracking(tracking: ResidentTracking)
+    override suspend fun updateTracking(tracking: ResidentTracking)
 
     @Delete
     suspend fun deleteResident(resident: Resident)
@@ -51,8 +52,8 @@ interface ResidentDao {
     suspend fun deleteAllResidents()
 
     @Query("UPDATE residents SET accountId = :accountId, weenectUsername = '', weenectPassword = '' WHERE id = :id")
-    suspend fun attachAccount(id: Long, accountId: Long)
+    override suspend fun attachAccount(id: Long, accountId: Long)
 
     @Query("UPDATE residents SET accountId = NULL WHERE accountId = :accountId")
-    suspend fun detachAccount(accountId: Long)
+    override suspend fun detachAccount(accountId: Long)
 }

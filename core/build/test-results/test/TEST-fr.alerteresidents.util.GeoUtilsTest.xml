@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="fr.alerteresidents.util.GeoUtilsTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-10-02T17:52:19.608Z" hostname="vm" time="0.015">
+  <properties/>
+  <testcase name="testConcavePolygon" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testHaversineIsSymmetric" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testFormatDistance" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.007"/>
+  <testcase name="testDistanceToPolygonBoundaryNearCorner" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testPolygonOrientationDoesNotMatter" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.001"/>
+  <testcase name="testHaversineDistanceZeroForSamePoint" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testBearingCardinal" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testDistanceToPolygonBoundary" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testDegeneratePolygonIsNeverInside" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testBearingBetweenPoints" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testPointOutsideSquare" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testPointInsideSquare" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testPolygonCenter" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <testcase name="testFormatTimeAgo" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.003"/>
+  <testcase name="testHaversineDistanceKnownPoints" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.002"/>
+  <testcase name="testHaversineOneThousandthDegreeOfLatitude" classname="fr.alerteresidents.util.GeoUtilsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

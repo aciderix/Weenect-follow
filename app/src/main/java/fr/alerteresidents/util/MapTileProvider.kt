@@ -79,7 +79,7 @@ class MapTileProvider(context: Context) {
 
                     val request = Request.Builder()
                         .url(url)
-                        .header("User-Agent", HttpClients.USER_AGENT)
+                        .header("User-Agent", HttpClients.userAgent)
                         .build()
 
                     okHttpClient.newCall(request).execute().use { response ->
