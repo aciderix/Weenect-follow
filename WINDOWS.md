@@ -38,6 +38,13 @@ Sur le PC : **Paramètres → Sauvegarde / import depuis le téléphone → Impo
 - Haut-parleurs branchés et allumés. Faire un **test d'alarme** à chaque prise de poste (**Paramètres → Son de l'alarme → Tester maintenant**).
 - L'écran **État** liste les points à vérifier (démarrage automatique, notifications, connexion, dernière vérification).
 
+## Déploiement sur plusieurs postes (infirmerie, cadres de santé…)
+
+- Installer le `.msi` sur chaque PC, puis importer sur chacun la même sauvegarde exportée depuis le téléphone (zone, résidents, comptes Weenect).
+- **Chaque poste surveille et sonne de façon indépendante** : quand un soignant clique « Je m'en occupe » sur un poste, les autres postes et les téléphones continuent de sonner jusqu'à ce qu'on les coupe aussi (pas de synchronisation entre appareils sans serveur commun).
+- Chaque poste interroge Weenect toutes les 15 s environ : avec beaucoup de postes, garder un œil sur l'écran **État** (erreurs de connexion Weenect).
+- Le proxy internet configuré dans Windows est utilisé automatiquement. Si le service informatique bloque les applications non signées, lui transmettre le `.msi` pour qu'il l'autorise.
+
 ## Données
 
 Tout est stocké dans `%LOCALAPPDATA%\AlerteResidents` (résidents, zone, journal, réglages, cache des cartes, journal technique). Les mots de passe Weenect sont chiffrés avec la protection de session Windows (DPAPI) : le fichier copié sur un autre PC ou un autre compte Windows ne permet pas de les relire.

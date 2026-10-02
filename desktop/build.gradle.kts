@@ -27,6 +27,8 @@ dependencies {
 compose.desktop {
   application {
     mainClass = "fr.alerteresidents.desktop.MainKt"
+    // Réseaux d'établissement : utiliser le proxy configuré dans Windows (ignoré par Java sinon).
+    jvmArgs += listOf("-Djava.net.useSystemProxies=true")
     nativeDistributions {
       targetFormats(TargetFormat.Msi, TargetFormat.Exe)
       packageName = "AlerteResidents"
