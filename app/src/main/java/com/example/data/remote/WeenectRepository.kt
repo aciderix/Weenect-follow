@@ -27,8 +27,13 @@ class WeenectRepository(
     private val facilityZoneDao: FacilityZoneDao,
     private val alertEventDao: AlertEventDao,
     private val onZoneExitDetected: (resident: Resident, distance: Double) -> Unit = { _, _ -> },
-    private val onZoneEnterDetected: (resident: Resident) -> Unit = { _ -> }
+    private val onZoneEnterDetected: (resident: Resident) -> Unit = { _ -> },
+    baseUrl: String = DEFAULT_BASE_URL
 ) {
+    companion object {
+        const val DEFAULT_BASE_URL = "https://apiv4.weenect.com/v4/"
+    }
+
     private val tokenCache = ConcurrentHashMap<String, String>() // username -> JWT token
 
     private val moshi = Moshi.Builder()
@@ -44,7 +49,7 @@ class WeenectRepository(
         .build()
 
     private val api: WeenectApiService = Retrofit.Builder()
-        .baseUrl("https://apiv4.weenect.com/v4/")
+        .baseUrl(baseUrl)
         .client(okHttpClient)
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
