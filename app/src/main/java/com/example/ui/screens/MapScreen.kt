@@ -248,7 +248,7 @@ fun MapScreen(
                                         color = if (isOutside) AlertRed else MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "Batterie ${res.lastBattery ?: 100}%",
+                                        text = if (res.lastBattery != null) "Batterie ${res.lastBattery}%" else "Batterie --",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

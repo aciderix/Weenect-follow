@@ -3,6 +3,7 @@ package com.example.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.NavDestination
 import com.example.SecuriResidentApp
 import com.example.data.model.AlertEvent
 import com.example.data.model.FacilityZone
@@ -62,6 +63,9 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
 
     private var autoRefreshJob: Job? = null
 
+    private val _pendingNavigation = MutableStateFlow<NavDestination?>(null)
+    val pendingNavigation: StateFlow<NavDestination?> = _pendingNavigation.asStateFlow()
+
     init {
         viewModelScope.launch {
             val currentZone = zoneDao.getFacilityZoneOnce()
@@ -71,19 +75,26 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
                 zoneDao.insertOrUpdate(currentZone.copy(name = "MAS l'Épeau"))
             }
         }
-        startAutoRefresh()
+        // Surveillance déléguée au ResidentMonitoringService pour éviter les doubles boucles et conflits
     }
 
-    private fun startAutoRefresh() {
-        autoRefreshJob?.cancel()
-        autoRefreshJob = viewModelScope.launch {
-            while (isActive) {
-                val currentZone = zoneDao.getFacilityZoneOnce() ?: FacilityZone()
-                val interval = currentZone.refreshIntervalSeconds.coerceAtLeast(10)
-                delay(interval * 1000L)
-                refreshAllPositions(showLoading = false)
+    fun navigateToAlert(residentId: Long) {
+        viewModelScope.launch {
+            if (residentId != -1L) {
+                var resident = residents.value.find { it.id == residentId }
+                if (resident == null) {
+                    resident = residentDao.getAllResidentsOnce().find { it.id == residentId }
+                }
+                if (resident != null) {
+                    _selectedResident.value = resident
+                }
             }
+            _pendingNavigation.value = NavDestination.MAP
         }
+    }
+
+    fun clearPendingNavigation() {
+        _pendingNavigation.value = null
     }
 
     fun selectResident(resident: Resident?) {
@@ -94,29 +105,34 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
         _operationMessage.value = null
     }
 
+    /**
+     * Rafraîchissement manuel à la demande de l'utilisateur (Pull-to-refresh ou bouton).
+     * Les alarmes sonores ne sont déclenchées qu'en cas de transition réelle par le WeenectRepository.
+     */
     fun refreshAllPositions(showLoading: Boolean = true) {
         viewModelScope.launch {
             if (showLoading) _isRefreshing.value = true
             val list = residents.value
+            var successCount = 0
+            var errorCount = 0
             for (resident in list) {
                 if (resident.isTrackingActive) {
                     val result = weenectRepo.syncResidentPosition(resident)
                     if (result.isSuccess) {
-                        val updated = result.getOrNull()
-                        if (updated != null && !updated.isInZone) {
-                            _isAlarmRinging.value = true
-                            soundAlertManager.playZoneExitAlarm(
-                                resident = updated,
-                                distanceMeters = updated.distanceFromCenterMeters,
-                                soundEnabled = facilityZone.value.soundAlertsEnabled,
-                                vibrateEnabled = facilityZone.value.vibrateAlertsEnabled,
-                                forceMaxVolume = true
-                            )
-                        }
+                        successCount++
+                    } else {
+                        errorCount++
                     }
                 }
             }
-            if (showLoading) _isRefreshing.value = false
+            if (showLoading) {
+                _isRefreshing.value = false
+                if (errorCount > 0) {
+                    _operationMessage.value = "Actualisé : $successCount balise(s) OK, $errorCount en attente de signal"
+                } else if (successCount > 0) {
+                    _operationMessage.value = "$successCount balise(s) actualisée(s)"
+                }
+            }
         }
     }
 
@@ -126,13 +142,8 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
             val res = weenectRepo.syncResidentPosition(resident)
             if (res.isSuccess) {
                 _operationMessage.value = "Position de ${resident.name} actualisée"
-                val updated = res.getOrNull()
-                if (updated != null && !updated.isInZone) {
-                    _isAlarmRinging.value = true
-                    soundAlertManager.playZoneExitAlarm()
-                }
             } else {
-                _operationMessage.value = "Erreur: ${res.exceptionOrNull()?.message}"
+                _operationMessage.value = "Signal Weenect en attente pour ${resident.name}"
             }
             _isRefreshing.value = false
         }
@@ -145,6 +156,9 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
                 _operationMessage.value = "Résident ${resident.name} ajouté avec succès"
             } else {
                 residentDao.updateResident(resident)
+                if (!resident.isTrackingActive) {
+                    soundAlertManager.stopAlarm(resident.id)
+                }
                 _operationMessage.value = "Fiche de ${resident.name} mise à jour"
             }
             refreshAllPositions(showLoading = false)
@@ -153,6 +167,7 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
 
     fun deleteResident(resident: Resident) {
         viewModelScope.launch {
+            soundAlertManager.stopAlarm(resident.id)
             residentDao.deleteResident(resident)
             if (_selectedResident.value?.id == resident.id) {
                 _selectedResident.value = null
@@ -167,7 +182,6 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
             _operationMessage.value = "Zone de sécurité mise à jour (${zone.radiusMeters.toInt()}m)"
             // Re-évaluer les positions de tous les résidents avec le nouveau rayon
             refreshAllPositions(showLoading = false)
-            startAutoRefresh()
         }
     }
 
@@ -207,9 +221,11 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun silenceAlarm() {
-        soundAlertManager.stopAlarm()
-        _isAlarmRinging.value = false
+    fun silenceAlarm(residentId: Long? = null) {
+        soundAlertManager.stopAlarm(residentId)
+        if (!soundAlertManager.isAlarmPlaying) {
+            _isAlarmRinging.value = false
+        }
     }
 
     fun acknowledgeAlert(alertId: Long, staffName: String = "Équipe Soins") {

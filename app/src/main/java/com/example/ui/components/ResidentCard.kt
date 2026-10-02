@@ -154,8 +154,9 @@ fun ResidentCard(
                 }
 
                 // Battery Pill
-                val battery = resident.lastBattery ?: 100
+                val battery = resident.lastBattery
                 val batteryColor = when {
+                    battery == null -> MaterialTheme.colorScheme.onSurfaceVariant
                     battery <= 20 -> AlertRed
                     battery <= 45 -> WarningAmber
                     else -> SafeGreen
@@ -170,14 +171,18 @@ fun ResidentCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (battery <= 20) Icons.Default.BatteryAlert else Icons.Default.BatteryFull,
+                            imageVector = when {
+                                battery == null -> Icons.Default.BatteryAlert
+                                battery <= 20 -> Icons.Default.BatteryAlert
+                                else -> Icons.Default.BatteryFull
+                            },
                             contentDescription = "Batterie",
                             tint = batteryColor,
                             modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "$battery%",
+                            text = if (battery != null) "$battery%" else "--",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = batteryColor
@@ -273,9 +278,14 @@ fun ResidentCard(
             val dist = resident.distanceFromCenterMeters
             val distStr = GeoUtils.formatDistance(dist)
             val timeStr = GeoUtils.formatTimeAgo(resident.lastUpdatedTime)
+            val isStale = resident.lastUpdatedTime != null && (System.currentTimeMillis() - resident.lastUpdatedTime) > 15 * 60 * 1000L
 
             Surface(
-                color = if (isOutside) AlertRedContainer else SafeGreenContainer,
+                color = when {
+                    isOutside -> AlertRedContainer
+                    isStale -> WarningAmber.copy(alpha = 0.15f)
+                    else -> SafeGreenContainer
+                },
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -291,30 +301,54 @@ fun ResidentCard(
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(
-                            imageVector = if (isOutside) Icons.Default.Warning else Icons.Default.CheckCircle,
+                            imageVector = when {
+                                isOutside -> Icons.Default.Warning
+                                isStale -> Icons.Default.Warning
+                                else -> Icons.Default.CheckCircle
+                            },
                             contentDescription = null,
-                            tint = if (isOutside) OnAlertRedContainer else OnSafeGreenContainer,
+                            tint = when {
+                                isOutside -> OnAlertRedContainer
+                                isStale -> WarningAmber
+                                else -> OnSafeGreenContainer
+                            },
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = if (isOutside) "HORS ZONE DE SÉCURITÉ" else "Dans l'enceinte de l'établissement",
+                                text = when {
+                                    isOutside -> "HORS ZONE DE SÉCURITÉ"
+                                    isStale -> "Signal ancien (> 15 min)"
+                                    else -> "Dans l'enceinte de l'établissement"
+                                },
                                 fontWeight = FontWeight.Black,
                                 fontSize = 13.sp,
-                                color = if (isOutside) OnAlertRedContainer else OnSafeGreenContainer
+                                color = when {
+                                    isOutside -> OnAlertRedContainer
+                                    isStale -> WarningAmber
+                                    else -> OnSafeGreenContainer
+                                }
                             )
                             Text(
-                                text = "Signal reçu : $timeStr",
+                                text = if (isStale) "Dernier fix : $timeStr (balise peut-être hors réseau)" else "Signal reçu : $timeStr",
                                 fontSize = 11.sp,
-                                color = (if (isOutside) OnAlertRedContainer else OnSafeGreenContainer).copy(alpha = 0.85f)
+                                color = (when {
+                                    isOutside -> OnAlertRedContainer
+                                    isStale -> WarningAmber
+                                    else -> OnSafeGreenContainer
+                                }).copy(alpha = 0.85f)
                             )
                         }
                     }
 
                     // Distance badge
                     Surface(
-                        color = if (isOutside) AlertRed else SafeGreen,
+                        color = when {
+                            isOutside -> AlertRed
+                            isStale -> WarningAmber
+                            else -> SafeGreen
+                        },
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(

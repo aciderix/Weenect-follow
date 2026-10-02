@@ -133,8 +133,11 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIncomingIntent(intent: Intent?) {
         val action = intent?.getStringExtra("EXTRA_ACTION")
+        val residentId = intent?.getLongExtra("EXTRA_RESIDENT_ID", -1L) ?: -1L
         if (action == "SILENCE_ALARM") {
-            viewModel.silenceAlarm()
+            viewModel.silenceAlarm(residentId.takeIf { it != -1L })
+        } else if (action == "VIEW_ALERT") {
+            viewModel.navigateToAlert(residentId)
         }
     }
 }
@@ -143,6 +146,14 @@ class MainActivity : ComponentActivity() {
 fun MainAppContent(viewModel: ResidentViewModel) {
     val context = LocalContext.current
     var currentDestination by remember { mutableStateOf(NavDestination.DASHBOARD) }
+    val pendingNavigation by viewModel.pendingNavigation.collectAsState()
+
+    LaunchedEffect(pendingNavigation) {
+        pendingNavigation?.let { dest ->
+            currentDestination = dest
+            viewModel.clearPendingNavigation()
+        }
+    }
     val unacknowledgedAlerts by viewModel.unacknowledgedAlerts.collectAsState()
     val outOfZoneResidents = viewModel.residents.collectAsState().value.filter { !it.isInZone }
     val isAlarmRinging by viewModel.isAlarmRinging.collectAsState()

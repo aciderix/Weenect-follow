@@ -62,7 +62,26 @@ class ResidentMonitoringService : Service() {
                 serviceScope.launch { doMonitoringCycle() }
             }
             else -> {
-                startForeground(NOTIFICATION_ID, buildOngoingNotification("Surveillance active"))
+                val notification = buildOngoingNotification("Surveillance active")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    val hasLocationPermission = com.example.util.LocationHelper.hasLocationPermission(this)
+                    val fgsType = if (hasLocationPermission) {
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+                                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                    } else {
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                    }
+                    startForeground(NOTIFICATION_ID, notification, fgsType)
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val hasLocationPermission = com.example.util.LocationHelper.hasLocationPermission(this)
+                    if (hasLocationPermission) {
+                        startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+                    } else {
+                        startForeground(NOTIFICATION_ID, notification)
+                    }
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
                 startMonitoringLoop()
             }
         }
@@ -99,9 +118,11 @@ class ResidentMonitoringService : Service() {
         val zone = app.database.facilityZoneDao().getFacilityZoneOnce()
         val residents = app.database.residentDao().getAllResidentsOnce()
 
-        // Si la zone est inactive ou aucun résident enregistré, on met à jour la notification
-        if (zone == null || !zone.isZoneActive || residents.isEmpty()) {
-            updateNotification("En veille (${residents.size} résident(s))")
+        val activeResidents = residents.filter { it.isTrackingActive }
+
+        // Si la zone est inactive ou aucun résident actif, on met à jour la notification
+        if (zone == null || !zone.isZoneActive || activeResidents.isEmpty()) {
+            updateNotification("En veille (${activeResidents.size}/${residents.size} résident(s) actifs)")
             return
         }
 
@@ -109,7 +130,7 @@ class ResidentMonitoringService : Service() {
         wakeLock?.acquire(6000L)
         try {
             var outsideCount = 0
-            for (resident in residents) {
+            for (resident in activeResidents) {
                 try {
                     val result = app.weenectRepository.syncResidentPosition(resident)
                     if (result.isSuccess) {
@@ -125,10 +146,15 @@ class ResidentMonitoringService : Service() {
                 }
             }
 
+            // Si plus aucun résident n'est dehors mais que l'alarme sonnait, couper la sonnerie automatiquement
+            if (outsideCount == 0 && app.soundAlertManager.isAlarmPlaying) {
+                app.soundAlertManager.stopAlarm()
+            }
+
             val statusText = if (outsideCount > 0) {
                 "🚨 ALERTE : $outsideCount résident(s) hors de la zone de sécurité !"
             } else {
-                "🟢 ${residents.size} résidents en sécurité - ${zone.name}"
+                "🟢 ${activeResidents.size} résidents suivis en sécurité - ${zone.name}"
             }
             updateNotification(statusText)
         } finally {
@@ -150,13 +176,14 @@ class ResidentMonitoringService : Service() {
         )
 
         val largeIcon = try {
-            BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+            BitmapFactory.decodeResource(resources, R.drawable.app_logo)
+                ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
         } catch (_: Exception) {
             null
         }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_MONITORING_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Surveillance active - MAS l'Épeau")
             .setContentText(statusText)
             .setOngoing(true)

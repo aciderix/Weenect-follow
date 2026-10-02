@@ -37,6 +37,9 @@ class SecuriResidentApp : Application() {
                     vibrateEnabled = true,
                     forceMaxVolume = true
                 )
+            },
+            onZoneEnterDetected = { resident ->
+                soundAlertManager.stopAlarm(resident.id)
             }
         )
 

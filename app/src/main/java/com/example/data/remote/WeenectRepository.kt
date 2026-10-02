@@ -26,7 +26,8 @@ class WeenectRepository(
     private val residentDao: ResidentDao,
     private val facilityZoneDao: FacilityZoneDao,
     private val alertEventDao: AlertEventDao,
-    private val onZoneExitDetected: (resident: Resident, distance: Double) -> Unit = { _, _ -> }
+    private val onZoneExitDetected: (resident: Resident, distance: Double) -> Unit = { _, _ -> },
+    private val onZoneEnterDetected: (resident: Resident) -> Unit = { _ -> }
 ) {
     private val tokenCache = ConcurrentHashMap<String, String>() // username -> JWT token
 
@@ -132,7 +133,7 @@ class WeenectRepository(
                         val latestPos = posResp.body()!!.first()
                         val lat = latestPos.latitude ?: resident.lastLatitude ?: zone.centerLatitude
                         val lon = latestPos.longitude ?: resident.lastLongitude ?: zone.centerLongitude
-                        val battery = latestPos.battery ?: resident.lastBattery ?: 100
+                        val battery = latestPos.battery ?: resident.lastBattery
                         val speed = latestPos.speed ?: 0.0
 
                         val (inZone, distance) = if (zone.zoneType == "POLYGON" && zone.getPolygonPoints().size >= 3) {
@@ -158,17 +159,21 @@ class WeenectRepository(
                         )
                         residentDao.updateResident(updated)
                         return@withContext Result.success(updated)
+                    } else {
+                        Log.w("WeenectRepository", "Weenect position empty or error (${posResp.code()}) for ${resident.name}")
+                        return@withContext Result.failure(Exception("Aucune nouvelle position Weenect reçue (code ${posResp.code()})"))
                     }
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w("WeenectRepository", "Live sync failed, will keep current position: ${e.message}")
+                Log.w("WeenectRepository", "Live sync failed for ${resident.name}: ${e.message}")
+                return@withContext Result.failure(e)
             }
         }
 
-        // Si mode démonstration ou balise configurée sans accès internet immédiat:
-        // On calcule la distance avec la dernière position connue
+        // Si balise en mode exercice ou test sans identifiants distants:
+        // On calcule la distance avec la dernière position connue sans inventer de fausse fraîcheur
         val currentLat = resident.lastLatitude ?: zone.centerLatitude
         val currentLon = resident.lastLongitude ?: zone.centerLongitude
         val (inZone, distance) = if (zone.zoneType == "POLYGON" && zone.getPolygonPoints().size >= 3) {
@@ -186,8 +191,8 @@ class WeenectRepository(
         val updated = resident.copy(
             lastLatitude = currentLat,
             lastLongitude = currentLon,
-            lastBattery = resident.lastBattery ?: 85,
-            lastUpdatedTime = resident.lastUpdatedTime ?: System.currentTimeMillis(),
+            lastBattery = resident.lastBattery,
+            lastUpdatedTime = resident.lastUpdatedTime,
             isInZone = inZone,
             distanceFromCenterMeters = distance
         )
@@ -228,6 +233,7 @@ class WeenectRepository(
                     distanceMeters = distance
                 )
             )
+            onZoneEnterDetected(resident)
         }
     }
 

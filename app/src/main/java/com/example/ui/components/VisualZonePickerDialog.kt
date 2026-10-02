@@ -213,7 +213,10 @@ fun VisualZonePickerDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -655,29 +658,23 @@ fun VisualZonePickerDialog(
                     }
                 }
 
-                // Calcul précis de la hauteur de la barre de navigation système Android
-                val navBarResourceId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
-                val systemNavBarHeight = if (navBarResourceId > 0) {
-                    (context.resources.getDimensionPixelSize(navBarResourceId) / context.resources.displayMetrics.density).dp
-                } else {
-                    56.dp
-                }
-                val bottomCardPadding = maxOf(systemNavBarHeight, 56.dp) + 16.dp
-
-                // 4. Panneau inférieur de configuration
+                // 4. Panneau inférieur de configuration (calé largement au-dessus de la barre de navigation)
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = bottomCardPadding),
+                        .navigationBarsPadding()
+                        .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 48.dp),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
                     Column(
                         modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
                             .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (selectedMode == 0) {
                             // Configuration Mode Cercle

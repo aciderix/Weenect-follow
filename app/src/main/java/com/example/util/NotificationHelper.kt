@@ -50,6 +50,8 @@ class NotificationHelper(private val context: Context) {
         }
     }
 
+    private val activeAlertIds = mutableSetOf<Int>()
+
     fun showEmergencyNotification(resident: Resident, distanceMeters: Double) {
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
@@ -86,6 +88,7 @@ class NotificationHelper(private val context: Context) {
         val silenceIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("EXTRA_ACTION", "SILENCE_ALARM")
+            putExtra("EXTRA_RESIDENT_ID", resident.id)
         }
         val silencePendingIntent = PendingIntent.getActivity(
             context,
@@ -96,13 +99,14 @@ class NotificationHelper(private val context: Context) {
 
         val distStr = GeoUtils.formatDistance(distanceMeters)
         val appIconBitmap = try {
-            android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
+            android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+                ?: android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
         } catch (_: Exception) {
             null
         }
 
         val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("🚨 ALERTE : ${resident.name} HORS ZONE !")
             .setContentText("Le résident est à $distStr du centre (${resident.roomNumber})")
             .setStyle(
@@ -136,15 +140,22 @@ class NotificationHelper(private val context: Context) {
         }
 
         val notification = notificationBuilder.build()
-        notificationManager.notify(NOTIFICATION_ID_OFFSET + resident.id.toInt(), notification)
+        val notifId = NOTIFICATION_ID_OFFSET + resident.id.toInt()
+        activeAlertIds.add(notifId)
+        notificationManager.notify(notifId, notification)
     }
 
     fun dismissEmergencyNotification(residentId: Long) {
-        notificationManager.cancel(NOTIFICATION_ID_OFFSET + residentId.toInt())
+        val notifId = NOTIFICATION_ID_OFFSET + residentId.toInt()
+        activeAlertIds.remove(notifId)
+        notificationManager.cancel(notifId)
     }
 
     fun dismissAllAlertNotifications() {
-        notificationManager.cancelAll()
+        activeAlertIds.forEach { id ->
+            notificationManager.cancel(id)
+        }
+        activeAlertIds.clear()
     }
 
     companion object {

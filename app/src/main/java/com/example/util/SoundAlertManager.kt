@@ -29,6 +29,10 @@ class SoundAlertManager(private val context: Context) {
     private var toneJob: Job? = null
     private var isPlaying = false
     private var originalAlarmVolume: Int? = null
+    private val activeAlarmResidentIds = mutableSetOf<Long>()
+
+    val isAlarmPlaying: Boolean
+        get() = isPlaying
 
     private val coroutineScope = CoroutineScope(Dispatchers.Default)
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -59,6 +63,8 @@ class SoundAlertManager(private val context: Context) {
         vibrateEnabled: Boolean = true,
         forceMaxVolume: Boolean = true
     ) {
+        resident?.let { activeAlarmResidentIds.add(it.id) }
+
         if (isPlaying) {
             if (resident != null) {
                 notificationHelper.showEmergencyNotification(resident, distanceMeters)
@@ -191,9 +197,23 @@ class SoundAlertManager(private val context: Context) {
     }
 
     /**
-     * Arrête immédiatement la sonnerie, les bips, la vibration et restaure le volume d'origine.
+     * Arrête la sonnerie, les bips, la vibration et restaure le volume d'origine.
+     * Si un residentId est fourni, ne coupe que ce résident ; si plus aucun résident n'est en alerte, stoppe la sonnerie.
      */
-    fun stopAlarm() {
+    fun stopAlarm(residentId: Long? = null) {
+        if (residentId != null) {
+            activeAlarmResidentIds.remove(residentId)
+            notificationHelper.dismissEmergencyNotification(residentId)
+        } else {
+            activeAlarmResidentIds.clear()
+            notificationHelper.dismissAllAlertNotifications()
+        }
+
+        // S'il reste d'autres résidents en alerte, on continue de faire sonner
+        if (activeAlarmResidentIds.isNotEmpty()) {
+            return
+        }
+
         isPlaying = false
 
         toneJob?.cancel()
@@ -221,7 +241,5 @@ class SoundAlertManager(private val context: Context) {
             } catch (_: Exception) {}
             originalAlarmVolume = null
         }
-
-        notificationHelper.dismissAllAlertNotifications()
     }
 }
