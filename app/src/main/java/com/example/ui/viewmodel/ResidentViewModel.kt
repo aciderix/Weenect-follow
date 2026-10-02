@@ -306,11 +306,19 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun simulateZoneReturn(resident: Resident) {
+        resolveAlertForResident(resident)
+    }
+
+    /**
+     * Lève immédiatement l'alerte pour un résident (marqué sécurisé dans l'établissement),
+     * stoppe la sonnerie, ferme la notification et retire le bandeau d'alerte.
+     */
+    fun resolveAlertForResident(resident: Resident) {
         viewModelScope.launch {
             val zone = facilityZone.value
-            val insideLat = zone.centerLatitude + 0.0002
-            val insideLon = zone.centerLongitude + 0.0002
-            val dist = GeoUtils.calculateDistanceMeters(insideLat, insideLon, zone.centerLatitude, zone.centerLongitude)
+            val insideLat = zone.centerLatitude
+            val insideLon = zone.centerLongitude
+            val dist = 0.0
 
             val updated = resident.copy(
                 lastLatitude = insideLat,
@@ -328,11 +336,38 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
                     alertType = "ENTER_ZONE",
                     latitude = insideLat,
                     longitude = insideLon,
-                    distanceMeters = dist
+                    distanceMeters = dist,
+                    isAcknowledged = true,
+                    acknowledgedBy = "Équipe Soins"
                 )
             )
+            silenceAlarm(resident.id)
+            _operationMessage.value = "Alerte levée : ${resident.name} est en sécurité dans l'établissement"
+        }
+    }
+
+    /**
+     * Lève toutes les alertes actives et réinitialise tous les résidents en zone sûre.
+     */
+    fun resolveAllActiveAlerts() {
+        viewModelScope.launch {
+            val zone = facilityZone.value
+            val currentResidents = residentDao.getAllResidentsOnce()
+            for (res in currentResidents) {
+                if (!res.isInZone) {
+                    val updated = res.copy(
+                        lastLatitude = zone.centerLatitude,
+                        lastLongitude = zone.centerLongitude,
+                        isInZone = true,
+                        distanceFromCenterMeters = 0.0,
+                        lastUpdatedTime = System.currentTimeMillis()
+                    )
+                    residentDao.updateResident(updated)
+                }
+            }
+            alertDao.acknowledgeAllAlerts()
             silenceAlarm()
-            _operationMessage.value = "${resident.name} de retour dans l'établissement"
+            _operationMessage.value = "Toutes les alertes ont été levées et acquittées"
         }
     }
 

@@ -233,6 +233,12 @@ fun DashboardScreen(
                     onViewOnMap = {
                         viewModel.selectResident(it)
                         onNavigateToMap(it)
+                    },
+                    onResolveAlert = { resident ->
+                        viewModel.resolveAlertForResident(resident)
+                    },
+                    onDismissAll = {
+                        viewModel.resolveAllActiveAlerts()
                     }
                 )
             }

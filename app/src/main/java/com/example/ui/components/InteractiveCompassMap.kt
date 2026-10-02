@@ -344,13 +344,17 @@ fun InteractiveCompassMap(
             }
         }
 
-        // Overlay: Center Facility Badge
-        Card(
+        // Overlay: Center Facility Badge (Ancré au pixel près au centre du bâtiment)
+        Surface(
             modifier = Modifier
-                .align(Alignment.Center)
-                .offset(x = panOffsetX.dp, y = (panOffsetY - 36).dp),
-            colors = CardDefaults.cardColors(containerColor = SafeNavy.copy(alpha = 0.95f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                .offset {
+                    IntOffset(
+                        (screenCenterX - 90).toInt(),
+                        (screenCenterY - 56).toInt()
+                    )
+                },
+            color = SafeNavy.copy(alpha = 0.95f),
+            shadowElevation = 6.dp,
             shape = RoundedCornerShape(10.dp)
         ) {
             Row(
@@ -375,8 +379,13 @@ fun InteractiveCompassMap(
                     color = SafeGreen,
                     shape = RoundedCornerShape(6.dp)
                 ) {
+                    val zoneTag = if (facilityZone.zoneType == "POLYGON" && facilityZone.getPolygonPoints().size >= 3) {
+                        "Parc"
+                    } else {
+                        "${facilityZone.radiusMeters.toInt()}m"
+                    }
                     Text(
-                        text = "${facilityZone.radiusMeters.toInt()}m",
+                        text = zoneTag,
                         color = Color.White,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
