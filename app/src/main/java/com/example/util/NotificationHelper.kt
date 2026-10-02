@@ -5,8 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.RingtoneManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -24,21 +23,14 @@ class NotificationHelper(private val context: Context) {
 
     private fun createAlertChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-
-            val audioAttributes = AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .build()
-
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "🚨 Alertes Critiques Sortie de Zone",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Bandeau flottant prioritaire et alerte plein écran lors d'une fuite ou sortie de zone"
-                setSound(soundUri, audioAttributes)
+                description = "Bandeau flottant prioritaire et alerte plein écran lors d'une sortie de zone"
+                // Le son d'alarme continu 100% est géré exclusivement par SoundAlertManager pour éviter les doublons/échos
+                setSound(null, null)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 600, 200, 600, 200, 1000)
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
@@ -53,9 +45,6 @@ class NotificationHelper(private val context: Context) {
     private val activeAlertIds = mutableSetOf<Int>()
 
     fun showEmergencyNotification(resident: Resident, distanceMeters: Double) {
-        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-
         // Intent d'ouverture d'urgence de l'application
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -99,8 +88,8 @@ class NotificationHelper(private val context: Context) {
 
         val distStr = GeoUtils.formatDistance(distanceMeters)
         val appIconBitmap = try {
-            android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
-                ?: android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
+            BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+                ?: BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
         } catch (_: Exception) {
             null
         }
@@ -116,10 +105,10 @@ class NotificationHelper(private val context: Context) {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setSound(soundUri)
             .setVibrate(longArrayOf(0, 600, 200, 600, 200, 1000))
             .setContentIntent(openAppPendingIntent)
             .setFullScreenIntent(openAppPendingIntent, true) // Affiche le bandeau flottant (Heads-Up) ou réveil plein écran
+            .setOnlyAlertOnce(true) // Empêche la notification de rejouer des alertes en boucle à chaque rafraîchissement de distance
             .setAutoCancel(false)
             .setColor(android.graphics.Color.RED)
             .setColorized(true)
@@ -159,7 +148,7 @@ class NotificationHelper(private val context: Context) {
     }
 
     companion object {
-        const val CHANNEL_ID = "channel_resident_zone_alerts_v3"
+        const val CHANNEL_ID = "channel_resident_zone_alerts_v4"
         private const val NOTIFICATION_ID_OFFSET = 1000
     }
 }

@@ -2,6 +2,11 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,9 +27,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VolumeUp
@@ -35,6 +45,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,8 +90,13 @@ fun MapScreen(
     val selectedResident by viewModel.selectedResident.collectAsState()
 
     var showVisualZonePicker by remember { mutableStateOf(false) }
+    var isCardVisible by remember { mutableStateOf(true) }
+    var isCardExpanded by remember { mutableStateOf(true) }
 
-    val currentFocusedResident = selectedResident ?: residents.find { !it.isInZone } ?: residents.firstOrNull()
+    // Toujours résoudre l'état frais du résident depuis la liste réactive
+    val currentFocusedResident = selectedResident?.let { sel ->
+        residents.find { it.id == sel.id } ?: sel
+    } ?: residents.find { !it.isInZone } ?: residents.firstOrNull()
 
     fun launchNavigation(resident: Resident) {
         val lat = resident.lastLatitude ?: facilityZone.centerLatitude
@@ -138,16 +154,19 @@ fun MapScreen(
                 facilityZone = facilityZone,
                 residents = residents,
                 selectedResident = currentFocusedResident,
-                onSelectResident = { viewModel.selectResident(it) },
+                onSelectResident = {
+                    viewModel.selectResident(it)
+                    isCardVisible = true
+                },
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Bottom Floating Card for Focused Resident
+            // Bottom Floating Panel for Focused Resident
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(14.dp)
+                    .padding(12.dp)
             ) {
                 // Resident Quick Selector Pills
                 if (residents.size > 1) {
@@ -168,7 +187,10 @@ fun MapScreen(
                                 },
                                 shadowElevation = 3.dp,
                                 modifier = Modifier
-                                    .clickable { viewModel.selectResident(res) }
+                                    .clickable {
+                                        viewModel.selectResident(res)
+                                        isCardVisible = true
+                                    }
                                     .testTag("map_select_pill_${res.id}")
                             ) {
                                 Row(
@@ -196,135 +218,234 @@ fun MapScreen(
                     }
                 }
 
-                // Selected Resident Detail Card
+                // Selected Resident Detail Card (Repliable et Fermable)
                 if (currentFocusedResident != null) {
                     val res = currentFocusedResident
                     val isOutside = !res.isInZone
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("map_focused_resident_card"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                    AnimatedVisibility(
+                        visible = isCardVisible,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = if (isOutside) Icons.Default.Warning else Icons.Default.CheckCircle,
-                                        contentDescription = null,
-                                        tint = if (isOutside) AlertRed else SafeGreen,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            text = res.name,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("map_focused_resident_card"),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                // Header: Nom, État, Distance, Boutons Réduire et Fermer
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isOutside) Icons.Default.Warning else Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = if (isOutside) AlertRed else SafeGreen,
+                                            modifier = Modifier.size(24.dp)
                                         )
-                                        Text(
-                                            text = if (isOutside) "HORS ZONE DE SÉCURITÉ" else "Dans l'établissement",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            color = if (isOutside) AlertRed else SafeGreen
-                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = res.name,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp
+                                            )
+                                            Text(
+                                                text = if (isOutside) "🚨 HORS ZONE DE SÉCURITÉ" else "🟢 Dans l'établissement",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp,
+                                                color = if (isOutside) AlertRed else SafeGreen
+                                            )
+                                        }
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 6.dp)) {
+                                            Text(
+                                                text = "À ${res.distanceFromCenterMeters.toInt()}m",
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 14.sp,
+                                                color = if (isOutside) AlertRed else MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = if (res.lastBattery != null) "Batterie ${res.lastBattery}%" else "Batterie --",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        // Bouton Réduire / Déplier
+                                        IconButton(
+                                            onClick = { isCardExpanded = !isCardExpanded },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isCardExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                                contentDescription = if (isCardExpanded) "Réduire" else "Déplier",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        // Bouton Fermer le panneau
+                                        IconButton(
+                                            onClick = { isCardVisible = false },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Fermer le panneau",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
 
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "À ${res.distanceFromCenterMeters.toInt()}m",
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 15.sp,
-                                        color = if (isOutside) AlertRed else MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = if (res.lastBattery != null) "Batterie ${res.lastBattery}%" else "Batterie --",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                // Contenu dépliable avec boutons d'actions
+                                AnimatedVisibility(visible = isCardExpanded) {
+                                    Column {
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        // Action buttons with guaranteed touch target >= 48dp
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            // 1. Bouton Guider
+                                            ElevatedButton(
+                                                onClick = { launchNavigation(res) },
+                                                modifier = Modifier
+                                                    .weight(1.1f)
+                                                    .height(48.dp)
+                                                    .testTag("map_navigate_btn"),
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                                                colors = ButtonDefaults.elevatedButtonColors(
+                                                    containerColor = if (isOutside) AlertRed else SafeNavy,
+                                                    contentColor = Color.White
+                                                ),
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(15.dp))
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Text(
+                                                    text = "Guider",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    softWrap = false
+                                                )
+                                            }
+
+                                            // 2. Bouton Lever alerte si dehors, sinon Sonner
+                                            if (isOutside) {
+                                                ElevatedButton(
+                                                    onClick = {
+                                                        viewModel.resolveAlertForResident(res)
+                                                    },
+                                                    modifier = Modifier
+                                                        .weight(1.3f)
+                                                        .height(48.dp)
+                                                        .testTag("map_resolve_alert_btn"),
+                                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                                                    colors = ButtonDefaults.elevatedButtonColors(
+                                                        containerColor = SafeGreen,
+                                                        contentColor = Color.White
+                                                    ),
+                                                    shape = RoundedCornerShape(12.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color.White)
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = "Sécurisé ✅",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color.White,
+                                                        maxLines = 1,
+                                                        softWrap = false
+                                                    )
+                                                }
+                                            }
+
+                                            // 3. Bouton Sonner
+                                            FilledTonalButton(
+                                                onClick = { viewModel.ringTracker(res) },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(48.dp)
+                                                    .testTag("map_ring_btn"),
+                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                Icon(Icons.Default.VolumeUp, contentDescription = null, modifier = Modifier.size(15.dp))
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Text(
+                                                    text = "Sonner",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    softWrap = false
+                                                )
+                                            }
+
+                                            // 4. Bouton SuperLive
+                                            FilledTonalButton(
+                                                onClick = { viewModel.activateSuperLive(res) },
+                                                modifier = Modifier
+                                                    .weight(1.1f)
+                                                    .height(48.dp)
+                                                    .testTag("map_superlive_btn"),
+                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(15.dp))
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Text(
+                                                    text = "SuperLive",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    softWrap = false
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
+                        }
+                    }
 
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Action buttons with guaranteed touch target >= 48dp and zero text wrapping
+                    // Petit bouton flottant pour ré-afficher le panneau si fermé
+                    if (!isCardVisible) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = SafeNavy,
+                            shadowElevation = 4.dp,
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .padding(top = 4.dp)
+                                .clickable {
+                                    isCardVisible = true
+                                    isCardExpanded = true
+                                }
+                        ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                ElevatedButton(
-                                    onClick = { launchNavigation(res) },
-                                    modifier = Modifier
-                                        .weight(1.1f)
-                                        .height(48.dp)
-                                        .testTag("map_navigate_btn"),
-                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                                    colors = ButtonDefaults.elevatedButtonColors(
-                                        containerColor = if (isOutside) AlertRed else SafeNavy,
-                                        contentColor = Color.White
-                                    ),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "Guider",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-
-                                FilledTonalButton(
-                                    onClick = { viewModel.ringTracker(res) },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp)
-                                        .testTag("map_ring_btn"),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.VolumeUp, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "Sonner",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-
-                                FilledTonalButton(
-                                    onClick = { viewModel.activateSuperLive(res) },
-                                    modifier = Modifier
-                                        .weight(1.1f)
-                                        .height(48.dp)
-                                        .testTag("map_superlive_btn"),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "SuperLive",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
+                                Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Afficher infos ${res.name}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

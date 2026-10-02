@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.media.ToneGenerator
@@ -24,17 +25,19 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class SoundAlertManager(private val context: Context) {
+    private var mediaPlayer: MediaPlayer? = null
     private var ringtone: Ringtone? = null
     private var toneGenerator: ToneGenerator? = null
     private var toneJob: Job? = null
     private var isPlaying = false
     private var originalAlarmVolume: Int? = null
     private val activeAlarmResidentIds = mutableSetOf<Long>()
+    private var alarmWakeLock: PowerManager.WakeLock? = null
 
     val isAlarmPlaying: Boolean
         get() = isPlaying
 
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
+    private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     val notificationHelper = NotificationHelper(context)
 
@@ -50,11 +53,11 @@ class SoundAlertManager(private val context: Context) {
 
     /**
      * Déclenche une alerte d'urgence majeure :
-     * - Réveil physique de l'écran (Screen WakeLock)
-     * - Sonnerie d'alarme continue + BIP-BIP d'urgence répétitif en boucle
+     * - Réveil physique garanti du CPU et de l'écran (Screen WakeLock)
+     * - Sonnerie d'alarme MediaPlayer continue et propre (sans écho ni doublon)
      * - Volume d'alarme forcé à 100%
      * - Vibration forte cadencée
-     * - Notification flottante plein écran (Heads-Up / FullScreenIntent)
+     * - Notification prioritaire plein écran (FullScreenIntent)
      */
     fun playZoneExitAlarm(
         resident: Resident? = null,
@@ -65,6 +68,7 @@ class SoundAlertManager(private val context: Context) {
     ) {
         resident?.let { activeAlarmResidentIds.add(it.id) }
 
+        // Si l'alarme est déjà en cours de lecture, ne mettre à jour que la notification
         if (isPlaying) {
             if (resident != null) {
                 notificationHelper.showEmergencyNotification(resident, distanceMeters)
@@ -73,18 +77,21 @@ class SoundAlertManager(private val context: Context) {
         }
         isPlaying = true
 
-        // 1. Allumer l'écran du téléphone même s'il est verrouillé ou en veille
+        // 1. WakeLock d'urgence pour maintenir le CPU et le haut-parleur actifs
+        acquireAlarmWakeLock()
+
+        // 2. Allumer l'écran du téléphone
         wakeUpScreen()
 
-        // 2. Afficher la notification prioritaire plein écran / bandeau flottant
+        // 3. Afficher la notification prioritaire plein écran (Heads-Up / Lockscreen)
         if (resident != null) {
             notificationHelper.showEmergencyNotification(resident, distanceMeters)
         }
 
-        // 3. Tenter d'ouvrir directement l'écran d'urgence au premier plan
+        // 4. Lancer MainActivity avec les flags nécessaires pour réveiller l'écran
         launchEmergencyScreen(resident)
 
-        // 4. Forcer le volume d'alarme au niveau maximal (100%)
+        // 5. Forcer le volume d'alarme au niveau maximal (100%)
         if (soundEnabled && forceMaxVolume) {
             try {
                 val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
@@ -96,14 +103,31 @@ class SoundAlertManager(private val context: Context) {
             }
         }
 
-        // 5. Déclencher le son d'alarme et les BIPs d'urgence
+        // 6. Déclencher une seule source sonore nette et puissante
         if (soundEnabled) {
             startEmergencyAudio()
         }
 
-        // 6. Vibration forte cadencée
+        // 7. Vibration forte cadencée
         if (vibrateEnabled) {
             startVibration()
+        }
+    }
+
+    private fun acquireAlarmWakeLock() {
+        try {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            if (alarmWakeLock == null) {
+                alarmWakeLock = powerManager?.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK,
+                    "AlerteResidents:EmergencyAlarmWakeLock"
+                )?.apply {
+                    setReferenceCounted(false)
+                }
+            }
+            alarmWakeLock?.acquire(300000L) // 5 minutes max
+        } catch (e: Exception) {
+            Log.w("SoundAlertManager", "Alarm wake lock error: ${e.message}")
         }
     }
 
@@ -111,12 +135,12 @@ class SoundAlertManager(private val context: Context) {
         try {
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
             val screenWakeLock = powerManager?.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                PowerManager.PARTIAL_WAKE_LOCK or
                         PowerManager.ACQUIRE_CAUSES_WAKEUP or
                         PowerManager.ON_AFTER_RELEASE,
-                "AlerteResidents:EmergencyWakeUpLock"
+                "AlerteResidents:ScreenWakeUpLock"
             )
-            screenWakeLock?.acquire(10000L) // Garde l'écran allumé pendant 10s
+            screenWakeLock?.acquire(10000L) // 10 secondes
         } catch (e: Exception) {
             Log.w("SoundAlertManager", "Screen wake lock error: ${e.message}")
         }
@@ -140,7 +164,9 @@ class SoundAlertManager(private val context: Context) {
     }
 
     private fun startEmergencyAudio() {
-        // A. Jouer la sonnerie d'alarme système
+        var startedPrimaryAudio = false
+
+        // A. Tentative 1 : MediaPlayer sur la sonnerie d'alarme système (en boucle propre)
         try {
             var alarmUri: Uri? = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             if (alarmUri == null) {
@@ -148,35 +174,64 @@ class SoundAlertManager(private val context: Context) {
             }
 
             if (alarmUri != null) {
-                ringtone = RingtoneManager.getRingtone(context, alarmUri)?.apply {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        audioAttributes = AudioAttributes.Builder()
+                mediaPlayer?.release()
+                mediaPlayer = MediaPlayer().apply {
+                    setDataSource(context, alarmUri)
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_ALARM)
                             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                             .build()
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        isLooping = true
-                    }
-                    play()
+                    )
+                    setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK)
+                    isLooping = true
+                    prepare()
+                    start()
                 }
+                startedPrimaryAudio = true
             }
         } catch (e: Exception) {
-            Log.e("SoundAlertManager", "Ringtone error: ${e.message}")
+            Log.w("SoundAlertManager", "MediaPlayer failed, attempting Ringtone fallback: ${e.message}")
         }
 
-        // B. Générateur de bips cadencés d'urgence (BIP-BIP-BIP médical garanti)
-        toneJob?.cancel()
-        toneJob = coroutineScope.launch {
+        // B. Tentative 2 : Fallback Ringtone si MediaPlayer n'a pas pu démarrer
+        if (!startedPrimaryAudio) {
             try {
-                toneGenerator = ToneGenerator(AudioManager.STREAM_ALARM, 100)
-                while (isActive && isPlaying) {
-                    // Émet un bip strident d'urgence pendant 1,5 seconde
-                    toneGenerator?.startTone(ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK, 1500)
-                    delay(2000L)
+                val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                if (alarmUri != null) {
+                    ringtone = RingtoneManager.getRingtone(context, alarmUri)?.apply {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            audioAttributes = AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ALARM)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .build()
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            isLooping = true
+                        }
+                        play()
+                    }
+                    startedPrimaryAudio = true
                 }
             } catch (e: Exception) {
-                Log.e("SoundAlertManager", "ToneGenerator loop error: ${e.message}")
+                Log.w("SoundAlertManager", "Ringtone fallback failed: ${e.message}")
+            }
+        }
+
+        // C. Tentative 3 : Si aucune sonnerie système n'est disponible, déclencher les bips d'urgence
+        if (!startedPrimaryAudio) {
+            toneJob?.cancel()
+            toneJob = coroutineScope.launch {
+                try {
+                    toneGenerator = ToneGenerator(AudioManager.STREAM_ALARM, 100)
+                    while (isActive && isPlaying) {
+                        toneGenerator?.startTone(ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK, 1500)
+                        delay(2000L)
+                    }
+                } catch (e: Exception) {
+                    Log.e("SoundAlertManager", "ToneGenerator loop error: ${e.message}")
+                }
             }
         }
     }
@@ -198,7 +253,6 @@ class SoundAlertManager(private val context: Context) {
 
     /**
      * Arrête la sonnerie, les bips, la vibration et restaure le volume d'origine.
-     * Si un residentId est fourni, ne coupe que ce résident ; si plus aucun résident n'est en alerte, stoppe la sonnerie.
      */
     fun stopAlarm(residentId: Long? = null) {
         if (residentId != null) {
@@ -209,7 +263,6 @@ class SoundAlertManager(private val context: Context) {
             notificationHelper.dismissAllAlertNotifications()
         }
 
-        // S'il reste d'autres résidents en alerte, on continue de faire sonner
         if (activeAlarmResidentIds.isNotEmpty()) {
             return
         }
@@ -218,6 +271,12 @@ class SoundAlertManager(private val context: Context) {
 
         toneJob?.cancel()
         toneJob = null
+
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+        } catch (_: Exception) {}
 
         try {
             ringtone?.stop()
@@ -233,6 +292,12 @@ class SoundAlertManager(private val context: Context) {
         try {
             vibrator?.cancel()
         } catch (_: Exception) {}
+
+        if (alarmWakeLock?.isHeld == true) {
+            try {
+                alarmWakeLock?.release()
+            } catch (_: Exception) {}
+        }
 
         // Restaurer le volume d'alarme initial
         originalAlarmVolume?.let { prevVol ->

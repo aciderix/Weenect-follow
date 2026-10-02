@@ -238,7 +238,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Tester sonnerie forte (100%)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Tester sonnerie (100%)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
@@ -250,6 +250,25 @@ fun SettingsScreen(
                         ) {
                             Text("Couper", fontSize = 12.sp)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Bouton spécial de test écran verrouillé avec compte à rebours
+                    FilledTonalButton(
+                        onClick = {
+                            viewModel.triggerLockscreenDelayedAlarmTest(6)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("btn_test_delayed_lockscreen_alarm"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = "⏱️ Tester sur écran verrouillé (6 sec)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
                     }
                 }
             }

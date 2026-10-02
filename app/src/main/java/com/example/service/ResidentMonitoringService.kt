@@ -13,7 +13,6 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.SecuriResidentApp
@@ -29,13 +28,15 @@ import kotlinx.coroutines.launch
 
 /**
  * Service d'arrière-plan permanent (Foreground Service).
- * Assure la surveillance et la détection d'alertes 24h/24 même si l'application est fermée ou le téléphone verrouillé.
+ * Assure la surveillance continue et la détection d'alertes 24h/24 même si l'écran est éteint,
+ * le téléphone verrouillé ou l'application fermée.
  */
 class ResidentMonitoringService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var monitoringJob: Job? = null
-    private var wakeLock: PowerManager.WakeLock? = null
+    private var continuousWakeLock: PowerManager.WakeLock? = null
+    private var isCycleRunning = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -44,11 +45,17 @@ class ResidentMonitoringService : Service() {
         createMonitoringNotificationChannel()
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-        wakeLock = powerManager?.newWakeLock(
+        continuousWakeLock = powerManager?.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
-            "AlerteResidents:MonitoringWakeLock"
+            "AlerteResidents:ContinuousMonitoringWakeLock"
         )?.apply {
             setReferenceCounted(false)
+        }
+        // Maintenir le CPU éveillé pour que la boucle de vérification continue sans interruption écran éteint
+        try {
+            continuousWakeLock?.acquire()
+        } catch (e: Exception) {
+            Log.e("ResidentMonitoring", "Wake lock acquire error: ${e.message}")
         }
     }
 
@@ -59,10 +66,12 @@ class ResidentMonitoringService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_REFRESH_NOW -> {
-                serviceScope.launch { doMonitoringCycle() }
+                serviceScope.launch { 
+                    doMonitoringCycle() 
+                }
             }
             else -> {
-                val notification = buildOngoingNotification("Surveillance active")
+                val notification = buildOngoingNotification("Surveillance active 24h/24")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     val hasLocationPermission = com.example.util.LocationHelper.hasLocationPermission(this)
                     val fgsType = if (hasLocationPermission) {
@@ -99,11 +108,12 @@ class ResidentMonitoringService : Service() {
                 } catch (e: CancellationException) {
                     break
                 } catch (e: Exception) {
-                    Log.e("ResidentMonitoring", "Erreur lors du cycle de surveillance: ${e.message}")
+                    Log.e("ResidentMonitoring", "Erreur cycle surveillance: ${e.message}")
                 }
 
                 val zone = app.database.facilityZoneDao().getFacilityZoneOnce()
                 val intervalSec = (zone?.refreshIntervalSeconds ?: 15).coerceAtLeast(10)
+
                 try {
                     delay(intervalSec * 1000L)
                 } catch (e: CancellationException) {
@@ -114,21 +124,23 @@ class ResidentMonitoringService : Service() {
     }
 
     private suspend fun doMonitoringCycle() {
-        val app = application as? SecuriResidentApp ?: return
-        val zone = app.database.facilityZoneDao().getFacilityZoneOnce()
-        val residents = app.database.residentDao().getAllResidentsOnce()
-
-        val activeResidents = residents.filter { it.isTrackingActive }
-
-        // Si la zone est inactive ou aucun résident actif, on met à jour la notification
-        if (zone == null || !zone.isZoneActive || activeResidents.isEmpty()) {
-            updateNotification("En veille (${activeResidents.size}/${residents.size} résident(s) actifs)")
+        if (isCycleRunning) return
+        isCycleRunning = true
+        val app = application as? SecuriResidentApp ?: run {
+            isCycleRunning = false
             return
         }
 
-        // Acquisition temporaire du WakeLock pour garantir que le CPU ne s'endort pas pendant le calcul GPS
-        wakeLock?.acquire(6000L)
         try {
+            val zone = app.database.facilityZoneDao().getFacilityZoneOnce()
+            val residents = app.database.residentDao().getAllResidentsOnce()
+            val activeResidents = residents.filter { it.isTrackingActive }
+
+            if (zone == null || !zone.isZoneActive || activeResidents.isEmpty()) {
+                updateNotification("En veille (${activeResidents.size}/${residents.size} résident(s) actifs)")
+                return
+            }
+
             var outsideCount = 0
             for (resident in activeResidents) {
                 try {
@@ -146,21 +158,21 @@ class ResidentMonitoringService : Service() {
                 }
             }
 
-            // Si plus aucun résident n'est dehors mais que l'alarme sonnait, couper la sonnerie automatiquement
+            // Si tous les résidents sont rentrés et l'alarme sonne, la couper
             if (outsideCount == 0 && app.soundAlertManager.isAlarmPlaying) {
                 app.soundAlertManager.stopAlarm()
             }
 
             val statusText = if (outsideCount > 0) {
-                "🚨 ALERTE : $outsideCount résident(s) hors de la zone de sécurité !"
+                "🚨 ALERTE : $outsideCount résident(s) hors zone !"
             } else {
                 "🟢 ${activeResidents.size} résidents suivis en sécurité - ${zone.name}"
             }
             updateNotification(statusText)
+        } catch (e: Exception) {
+            Log.e("ResidentMonitoring", "Cycle exception: ${e.message}")
         } finally {
-            if (wakeLock?.isHeld == true) {
-                wakeLock?.release()
-            }
+            isCycleRunning = false
         }
     }
 
@@ -222,8 +234,8 @@ class ResidentMonitoringService : Service() {
     override fun onDestroy() {
         monitoringJob?.cancel()
         serviceScope.cancel()
-        if (wakeLock?.isHeld == true) {
-            wakeLock?.release()
+        if (continuousWakeLock?.isHeld == true) {
+            continuousWakeLock?.release()
         }
         super.onDestroy()
     }
@@ -247,7 +259,12 @@ class ResidentMonitoringService : Service() {
                     context.startService(intent)
                 }
             } catch (e: Exception) {
-                Log.e("ResidentMonitoring", "Failed to start monitoring service: ${e.message}")
+                // Fallback si l'application est en arrière-plan lors de l'appel
+                try {
+                    context.startService(intent)
+                } catch (ex: Exception) {
+                    Log.w("ResidentMonitoring", "Could not start service: ${ex.message}")
+                }
             }
         }
 
@@ -255,7 +272,9 @@ class ResidentMonitoringService : Service() {
             val intent = Intent(context, ResidentMonitoringService::class.java).apply {
                 action = ACTION_STOP
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (_: Exception) {}
         }
     }
 }

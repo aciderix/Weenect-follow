@@ -305,6 +305,18 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
         _operationMessage.value = "Sonnerie d'urgence maximale activée (Volume forcé à 100%)"
     }
 
+    /**
+     * Déclenche un test d'alarme différé de 6 secondes permettant à l'utilisateur de verrouiller l'écran
+     * avec le bouton physique Power pour tester le réveil automatique.
+     */
+    fun triggerLockscreenDelayedAlarmTest(delaySeconds: Int = 6) {
+        viewModelScope.launch {
+            _operationMessage.value = "Test armé : VERROUILLEZ votre écran (bouton Power) ! Déclenchement dans $delaySeconds sec..."
+            kotlinx.coroutines.delay(delaySeconds * 1000L)
+            triggerManualLoudAlarmTest()
+        }
+    }
+
     fun simulateZoneReturn(resident: Resident) {
         resolveAlertForResident(resident)
     }
