@@ -275,3 +275,9 @@ _Tous les points de l'audit ont été traités, **sauf la synchronisation Supaba
 | `UiSmokeTest` / `UiSmokeDarkTest` | Rendu réel de 11 écrans et dialogues avec 8 résidents dans tous les états, en clair et en sombre ; captures dans `app/build/ui-screenshots/` (aperçu dans `docs/captures/`) |
 
 Android Lint : 0 erreur.
+
+---
+
+# Application Windows
+
+Une version PC (poste fixe qui sonne, démarrage automatique avec Windows) est disponible dans le module `desktop/`. Elle partage la logique de surveillance avec l'app Android via le module `core/`. Installation et utilisation : voir [WINDOWS.md](WINDOWS.md).

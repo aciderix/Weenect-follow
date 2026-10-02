@@ -15,6 +15,8 @@ dependencies {
   implementation(compose.material3)
   implementation(compose.materialIconsExtended)
   implementation(libs.jna.platform)
+  implementation("com.squareup.moshi:moshi-kotlin:1.15.2")
+  implementation(kotlin("reflect")) // aligne kotlin-reflect sur la version de Kotlin (moshi-kotlin tire une 1.8)
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
@@ -31,7 +33,7 @@ compose.desktop {
       packageVersion = "2.0.0"
       description = "Surveillance des résidents équipés de balises Weenect"
       vendor = "Alerte Résidents"
-      modules("java.naming", "java.sql", "jdk.crypto.ec", "java.desktop")
+      modules("java.naming", "java.sql", "jdk.crypto.ec", "java.desktop", "java.instrument", "jdk.unsupported", "java.logging", "java.net.http")
       windows {
         menuGroup = "Alerte Résidents"
         shortcut = true
@@ -44,4 +46,10 @@ compose.desktop {
       }
     }
   }
+}
+
+tasks.test {
+  // Jamais le vrai dossier de données de l'utilisateur pendant les tests.
+  systemProperty("alerteresidents.dataDir", layout.buildDirectory.dir("test-data").get().asFile.path)
+  project.findProperty("screenshotDir")?.let { systemProperty("screenshotDir", it.toString()) }
 }

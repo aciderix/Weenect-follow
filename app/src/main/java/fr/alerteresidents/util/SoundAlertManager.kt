@@ -29,15 +29,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/** Une alarme en cours pour un résident. */
-data class AlarmInfo(
-    val residentId: Long,
-    val residentName: String,
-    val isDrill: Boolean,
-    val isReminder: Boolean,
-    val startedAt: Long
-)
-
 /**
  * Alarme d'urgence : son continu sur le canal ALARM, vibration et notification plein écran.
  * Plusieurs résidents peuvent être en alarme en même temps : le son s'arrête quand la dernière
