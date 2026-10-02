@@ -337,30 +337,42 @@ fun DashboardScreen(
                                     contentColor = Color.White
                                 ),
                                 shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
                                 modifier = Modifier
-                                    .weight(1.3f)
+                                    .weight(1.25f)
+                                    .height(44.dp)
                                     .testTag("btn_visual_map_zone")
                             ) {
-                                Icon(Icons.Default.Map, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(Icons.Default.Map, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "🎯 Tracer zone",
+                                    text = "Tracer zone",
                                     color = Color.White,
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
 
                             OutlinedButton(
                                 onClick = { showZoneEditor = true },
                                 shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
                                 modifier = Modifier
                                     .weight(1f)
+                                    .height(44.dp)
                                     .testTag("btn_configure_zone")
                             ) {
                                 Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Régler", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "Régler",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
 
                             ElevatedButton(
@@ -370,11 +382,19 @@ fun DashboardScreen(
                                     contentColor = MaterialTheme.colorScheme.onSurface
                                 ),
                                 shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .weight(0.95f)
+                                    .height(44.dp)
                                     .testTag("btn_quick_open_map")
                             ) {
-                                Text("Radar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "Radar",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
                         }
 

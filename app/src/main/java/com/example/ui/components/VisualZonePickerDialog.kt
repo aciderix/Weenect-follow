@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -658,13 +659,12 @@ fun VisualZonePickerDialog(
                     }
                 }
 
-                // 4. Panneau inférieur de configuration (calé largement au-dessus de la barre de navigation)
+                // 4. Panneau inférieur de configuration (calé très largement au-dessus de la barre de navigation physique ou gestuelle)
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 48.dp),
+                        .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 86.dp),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -791,13 +791,14 @@ fun VisualZonePickerDialog(
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = SafeGreen, contentColor = Color.White),
                                     shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                                     modifier = Modifier
                                         .weight(1.1f)
                                         .height(48.dp)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("+ Borne 🎯", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                    Text("+ Borne 🎯", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White, maxLines = 1)
                                 }
 
                                 Button(
@@ -807,6 +808,7 @@ fun VisualZonePickerDialog(
                                         contentColor = Color.White
                                     ),
                                     shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                                     modifier = Modifier
                                         .weight(1.3f)
                                         .height(48.dp)
@@ -818,7 +820,7 @@ fun VisualZonePickerDialog(
                                     } else {
                                         "Valider (${polygonPoints.size}/3 min)"
                                     }
-                                    Text(label, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                    Text(label, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White, maxLines = 1)
                                 }
                             }
                         }
