@@ -24,7 +24,11 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Button
+import androidx.compose.material3.RadioButton
+import androidx.compose.ui.semantics.Role
+import fr.alerteresidents.util.AlarmSound
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -78,6 +82,7 @@ fun SettingsScreen(viewModel: ResidentViewModel, onOpenStatus: () -> Unit, modif
     val accounts by viewModel.accounts.collectAsState()
     val staffName by viewModel.prefs.staffName.collectAsState()
     val hasPin by viewModel.prefs.hasPin.collectAsState()
+    val alarmSound by viewModel.prefs.alarmSound.collectAsState()
 
     var showZoneEditor by remember { mutableStateOf(false) }
     var showVisualMapPicker by remember { mutableStateOf(false) }
@@ -156,9 +161,24 @@ fun SettingsScreen(viewModel: ResidentViewModel, onOpenStatus: () -> Unit, modif
                 )
             }
 
-            SettingsCard(Icons.Default.VolumeUp, "Tester l'alarme", "Volume forcé à 100 %, canal Alarme, vibration") {
+            SettingsCard(Icons.Default.VolumeUp, "Son de l'alarme", "Volume forcé à 100 %, canal Alarme, vibration") {
+                AlarmSound.entries.forEach { sound ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                            .selectable(selected = alarmSound == sound, role = Role.RadioButton) { viewModel.prefs.setAlarmSound(sound) }
+                            .testTag("alarm_sound_${sound.name}")
+                    ) {
+                        RadioButton(selected = alarmSound == sound, onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(sound.label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(sound.description, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
                 Text(
-                    "Le test se comporte comme une vraie alerte (son, vibration, notification plein écran) mais est marqué « exercice ». " +
+                    "Choisissez un son puis « Tester maintenant ». Le test se comporte comme une vraie alerte (son, vibration, notification plein écran) mais est marqué « exercice ». " +
                         "Pour un exercice sur un résident, utilisez le menu ⋮ de sa fiche.",
                     fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

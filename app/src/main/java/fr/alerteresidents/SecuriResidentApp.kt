@@ -35,7 +35,7 @@ class SecuriResidentApp : Application() {
         super.onCreate()
         database = AppDatabase.getInstance(this)
         preferences = AppPreferences(this)
-        soundAlertManager = SoundAlertManager(this)
+        soundAlertManager = SoundAlertManager(this, soundChoice = { preferences.alarmSound.value })
         val notifications = soundAlertManager.notificationHelper
 
         weenectRepository = WeenectRepository(

@@ -15,6 +15,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
 import fr.alerteresidents.MainActivity
+import fr.alerteresidents.R
 import fr.alerteresidents.data.model.FacilityZone
 import fr.alerteresidents.data.model.Resident
 import kotlinx.coroutines.CoroutineScope
@@ -44,10 +45,12 @@ data class AlarmInfo(
  */
 class SoundAlertManager(
     private val context: Context,
-    val notificationHelper: NotificationHelper = NotificationHelper(context)
+    val notificationHelper: NotificationHelper = NotificationHelper(context),
+    /** Son choisi dans les Paramètres (lu à chaque déclenchement). */
+    private val soundChoice: () -> AlarmSound = { AlarmSound.SIREN }
 ) {
     private val lock = Any()
-    private var mediaPlayer: MediaPlayer? = null
+    private val players = mutableListOf<MediaPlayer>()
     private var ringtone: Ringtone? = null
     private var toneGenerator: ToneGenerator? = null
     private var toneJob: Job? = null
@@ -161,41 +164,67 @@ class SoundAlertManager(
         }
     }
 
-    private fun startEmergencyAudio() {
+    private val alarmAttributes: AudioAttributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_ALARM)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
+
+    /** Sirène intégrée (res/raw), jouée en boucle sur le canal Alarme. */
+    private fun startSiren(): Boolean = try {
+        val afd = context.resources.openRawResourceFd(R.raw.alarme_sirene)
+        val player = MediaPlayer().apply {
+            afd.use { setDataSource(it.fileDescriptor, it.startOffset, it.length) }
+            setAudioAttributes(alarmAttributes)
+            isLooping = true
+            prepare()
+            start()
+        }
+        players.add(player)
+        true
+    } catch (e: Exception) {
+        Log.w(TAG, "Siren failed: ${e.message}")
+        false
+    }
+
+    /** Sonnerie d'alarme du téléphone (MediaPlayer, sinon Ringtone). */
+    private fun startPhoneAlarm(): Boolean {
         val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ALARM)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build()
-
-        synchronized(lock) {
-            if (alarmUri != null) {
-                try {
-                    mediaPlayer?.release()
-                    mediaPlayer = MediaPlayer().apply {
-                        setDataSource(context, alarmUri)
-                        setAudioAttributes(attrs)
-                        isLooping = true
-                        prepare()
-                        start()
-                    }
-                    return
-                } catch (e: Exception) {
-                    Log.w(TAG, "MediaPlayer failed, trying Ringtone: ${e.message}")
-                    mediaPlayer = null
-                }
-                try {
-                    ringtone = RingtoneManager.getRingtone(context, alarmUri)?.apply {
-                        audioAttributes = attrs
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) isLooping = true
-                        play()
-                    }
-                    if (ringtone != null) return
-                } catch (e: Exception) {
-                    Log.w(TAG, "Ringtone fallback failed: ${e.message}")
-                }
+            ?: return false
+        try {
+            val player = MediaPlayer().apply {
+                setDataSource(context, alarmUri)
+                setAudioAttributes(alarmAttributes)
+                isLooping = true
+                prepare()
+                start()
             }
+            players.add(player)
+            return true
+        } catch (e: Exception) {
+            Log.w(TAG, "Phone alarm MediaPlayer failed, trying Ringtone: ${e.message}")
+        }
+        return try {
+            ringtone = RingtoneManager.getRingtone(context, alarmUri)?.apply {
+                audioAttributes = alarmAttributes
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) isLooping = true
+                play()
+            }
+            ringtone != null
+        } catch (e: Exception) {
+            Log.w(TAG, "Ringtone fallback failed: ${e.message}")
+            false
+        }
+    }
+
+    private fun startEmergencyAudio() {
+        synchronized(lock) {
+            val started = when (soundChoice()) {
+                AlarmSound.SIREN -> startSiren() || startPhoneAlarm()
+                AlarmSound.PHONE -> startPhoneAlarm() || startSiren()
+                AlarmSound.BOTH -> startSiren() or startPhoneAlarm()
+            }
+            if (started) return
             // Dernier recours : bips d'urgence
             toneJob?.cancel()
             toneJob = scope.launch {
@@ -245,9 +274,8 @@ class SoundAlertManager(
             soundPlaying = false
             toneJob?.cancel()
             toneJob = null
-            runCatching { mediaPlayer?.stop() }
-            runCatching { mediaPlayer?.release() }
-            mediaPlayer = null
+            players.forEach { p -> runCatching { p.stop() }; runCatching { p.release() } }
+            players.clear()
             runCatching { ringtone?.stop() }
             ringtone = null
             runCatching { toneGenerator?.stopTone(); toneGenerator?.release() }
