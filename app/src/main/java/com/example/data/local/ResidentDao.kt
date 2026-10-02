@@ -35,6 +35,9 @@ interface ResidentDao {
     @Query("DELETE FROM residents WHERE id = :id")
     suspend fun deleteResidentById(id: Long)
 
+    @Query("DELETE FROM residents")
+    suspend fun deleteAllResidents()
+
     @Query("""
         UPDATE residents 
         SET lastLatitude = :lat, 

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
@@ -71,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.service.ResidentMonitoringService
 import com.example.data.remote.SupabaseSyncService
+import com.example.ui.components.ConfigSyncDialog
 import com.example.ui.components.VisualZonePickerDialog
 import com.example.ui.components.ZoneEditorDialog
 import com.example.ui.theme.AlertRed
@@ -85,12 +87,15 @@ fun SettingsScreen(
     viewModel: ResidentViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val facilityZone by viewModel.facilityZone.collectAsState()
+    val residents by viewModel.residents.collectAsState()
     val isAlarmRinging by viewModel.isAlarmRinging.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
     var showZoneEditor by remember { mutableStateOf(false) }
     var showVisualMapPicker by remember { mutableStateOf(false) }
+    var showBackupDialog by remember { mutableStateOf(false) }
     var isTestingSupabase by remember { mutableStateOf(false) }
     var supabaseStatusMessage by remember { mutableStateOf<String?>(null) }
 
@@ -353,6 +358,55 @@ fun SettingsScreen(
                 }
             }
 
+            // Sauvegarde & Exportation Flotte soignante (1-Clic)
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(SafeNavy.copy(alpha = 0.1f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.CloudDone, contentDescription = null, tint = SafeNavy)
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text("Sauvegarde & Flotte d'appareils", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("Cloner ou mettre à jour un smartphone en 1 clic", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Exporte l'ensemble des fiches résidents, balises Weenect et tracé du périmètre GPS pour configurer immédiatement un nouveau téléphone soignant sans ressaisir.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = { showBackupDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("open_backup_dialog_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = SafeNavy)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Exporter ou Importer la configuration", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+
             // Cloud Supabase Sync
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -481,6 +535,20 @@ fun SettingsScreen(
             onZoneSaved = { updatedZone ->
                 viewModel.updateFacilityZone(updatedZone)
                 showVisualMapPicker = false
+            }
+        )
+    }
+
+    if (showBackupDialog) {
+        ConfigSyncDialog(
+            currentZone = facilityZone,
+            residents = residents,
+            onDismiss = { showBackupDialog = false },
+            onExportShared = { exportedBy ->
+                viewModel.exportConfiguration(context, exportedBy)
+            },
+            onImportApplied = { backupData, replaceExisting ->
+                viewModel.importConfiguration(backupData, replaceExisting)
             }
         )
     }

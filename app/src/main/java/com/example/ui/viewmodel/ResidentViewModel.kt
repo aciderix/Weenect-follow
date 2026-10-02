@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.NavDestination
@@ -337,5 +338,71 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
 
     suspend fun testWeenectCredentials(username: String, pass: String): Result<List<WeenectTrackerDto>> {
         return weenectRepo.getTrackers(username, pass)
+    }
+
+    /**
+     * Exporte la configuration complète (Zone + Résidents + Balises) et ouvre le partage Android.
+     */
+    fun exportConfiguration(context: Context, exportedBy: String = "Équipe Soignante") {
+        viewModelScope.launch {
+            val zone = facilityZone.value
+            val resList = residentDao.getAllResidentsOnce()
+            val success = com.example.util.ConfigBackupManager.exportAndShare(context, zone, resList, exportedBy)
+            if (success) {
+                _operationMessage.value = "Fichier de configuration prêt au partage"
+            } else {
+                _operationMessage.value = "Erreur lors de la génération de l'export"
+            }
+        }
+    }
+
+    /**
+     * Importe une configuration complète avec option de remplacement ou de fusion.
+     */
+    fun importConfiguration(backupData: com.example.util.BackupData, replaceExisting: Boolean) {
+        viewModelScope.launch {
+            try {
+                // 1. Mise à jour de la zone
+                zoneDao.insertOrUpdate(backupData.facilityZone)
+
+                // 2. Gestion des résidents
+                if (replaceExisting) {
+                    residentDao.deleteAllResidents()
+                    for (res in backupData.residents) {
+                        residentDao.insertResident(res)
+                    }
+                } else {
+                    val existing = residentDao.getAllResidentsOnce()
+                    for (res in backupData.residents) {
+                        val duplicate = existing.find { 
+                            (res.trackerId != null && it.trackerId == res.trackerId) || 
+                            it.name.equals(res.name, ignoreCase = true) 
+                        }
+                        if (duplicate != null) {
+                            // Mettre à jour avec les nouveaux identifiants
+                            residentDao.updateResident(
+                                duplicate.copy(
+                                    weenectUsername = res.weenectUsername.ifBlank { duplicate.weenectUsername },
+                                    weenectPassword = res.weenectPassword.ifBlank { duplicate.weenectPassword },
+                                    trackerId = res.trackerId ?: duplicate.trackerId,
+                                    trackerName = res.trackerName ?: duplicate.trackerName,
+                                    roomNumber = res.roomNumber.ifBlank { duplicate.roomNumber },
+                                    emergencyContact = res.emergencyContact.ifBlank { duplicate.emergencyContact },
+                                    notes = res.notes.ifBlank { duplicate.notes }
+                                )
+                            )
+                        } else {
+                            residentDao.insertResident(res)
+                        }
+                    }
+                }
+
+                _operationMessage.value = "Configuration ${backupData.facilityZone.name} importée avec succès (${backupData.residents.size} résidents)"
+                refreshAllPositions(showLoading = false)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _operationMessage.value = "Erreur d'import : ${e.message}"
+            }
+        }
     }
 }
