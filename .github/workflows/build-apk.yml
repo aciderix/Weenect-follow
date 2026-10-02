@@ -23,12 +23,6 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: Ensure .env file exists
-        run: |
-          if [ ! -f ".env" ]; then
-            cp .env.example .env 2>/dev/null || touch .env
-          fi
-
       - name: Ensure debug keystore exists
         run: |
           if [ -f "debug.keystore.base64" ]; then

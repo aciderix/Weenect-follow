@@ -181,3 +181,96 @@ Lancer les tests : `./gradlew testDebugUnitTest`
 8. **Photo du résident** dans la notification et la pop-up d'alarme (le champ `photoUri` existe déjà) — utile pour un intérimaire qui ne connaît pas le résident.
 9. **Export PDF/CSV du journal** pour les rapports d'événements indésirables.
 10. **Code PIN / verrouillage** de l'écran Paramètres pour éviter les modifications involontaires.
+
+---
+
+# Corrections apportées (version 2.0)
+
+_Tous les points de l'audit ont été traités, **sauf la synchronisation Supabase** (points 15 et 46), laissée en l'état à ta demande : l'écran Supabase est inchangé._
+
+## Points critiques
+
+| # | Point | Ce qui a été fait |
+|---|---|---|
+| 1 | Panne de synchro invisible | Le service publie son état réel (`MonitoringHealth`) : en-tête vert / orange / rouge sur le tableau de bord, notification permanente qui dit la vérité (« ⚠️ aucune balise joignable »), avertissement sonore « Surveillance dégradée » après 3 cycles en échec. **L'alarme n'est plus jamais coupée par une erreur réseau** : elle ne s'arrête que si la balise confirme le retour ou si un soignant agit. |
+| 2 | Cas inconnus affichés « en sécurité » | Nouveau statut **« Position inconnue »** (orange). Mauvais mot de passe, balise absente, position vide → erreur enregistrée et affichée (« Identifiants Weenect refusés », « Aucune balise associée »…). Aucune coordonnée n'est jamais inventée. On ne peut plus enregistrer un résident « suivi » sans compte ni balise. |
+| 3 | Position ancienne affichée récente | L'heure affichée est celle du **fix de la balise** (`date_tracker`). Statut « Signal ancien » au-delà du délai réglable (15 min par défaut) + avertissement « Balise muette ». |
+| 4 | Mots de passe exposés | Comptes Weenect séparés, mots de passe **chiffrés (AES-256-GCM, Android Keystore)**. Migration automatique des anciens mots de passe en clair. Logs réseau uniquement en debug, sans corps ni jeton. Sauvegarde Google et transfert d'appareil désactivés. Export : sans mot de passe, ou chiffré par un code (PBKDF2 + AES-GCM). |
+| 5 | Vraie alarme ≠ alarme de test | Une seule source de vérité (`SoundAlertManager.activeAlarms`) : la pop-up s'affiche pour **toute** alarme réelle. Les réglages son / vibration de la zone sont respectés (sans son, la vibration reste toujours active). |
+| 6 | « X » qui lève tout / téléportation | Le « X » est remplacé par un simple repli. « Je m'en occupe » et « Retrouvé » changent l'**état de l'alerte**, jamais la position : la balise confirme ensuite le retour. |
+
+## Points majeurs
+
+| # | Point | Ce qui a été fait |
+|---|---|---|
+| 7 | Commandes balise | Code HTTP vérifié, reconnexion automatique sur jeton expiré, message d'échec explicite. |
+| 8 | Synchros concurrentes | Un verrou par résident, mises à jour partielles (la fiche et le suivi ne s'écrasent plus). Testé : 4 synchros simultanées = 1 seule alarme. |
+| 9 | Service « location » | Type `specialUse` uniquement ; permissions inutiles retirées (`DATA_SYNC`, `LOCATION`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`). Wakelock renouvelé par cycle avec délai. |
+| 10 | Réveil de l'écran | Vérification de l'autorisation « plein écran » (Android 14+) avec bouton « Corriger » dans l'écran État. Suppression du wakelock d'écran inopérant. |
+| 11 | Migrations destructives | Schéma exporté (`app/schemas`), migration v3 → v4 écrite et **testée** ; plus aucune suppression silencieuse. |
+| 12 | Pas de rappel / batterie / hors ligne | Rappel sonore si la sortie n'est pas prise en charge après N min (réglable). Alertes « Batterie faible » (20 %) et « Balise muette » / « Connexion Weenect impossible », une seule fois puis réarmées. |
+| 13 | Faux positifs en bordure | Sortie confirmée seulement si le fix est hors zone malgré sa précision, ou par un 2ᵉ fix, ou après 60 s. Un nouveau fix est demandé immédiatement à la balise. |
+| 14 | « Guider » dans le navigateur | Bloc `<queries>` + `MapsNavigator` : appli Google Maps (guidage piéton), sinon toute appli de cartes, sinon navigateur. Plus de coordonnées 0,0. |
+
+## Plusieurs résidents
+
+| # | Point | Ce qui a été fait |
+|---|---|---|
+| 16 | Tri par urgence | Hors zone (le plus ancien d'abord) → inconnu → signal ancien → batterie faible → en sécurité → en pause → désactivé ; puis niveau de risque, puis nom. |
+| 17 | Vue compacte / grille | 3 modes : cartes détaillées, liste compacte, grille de tuiles colorées (mémorisé). |
+| 18 | Filtres / recherche | Filtres « Hors zone », « Sans position fiable », « Batterie faible », « En sécurité », « En pause / non suivis » avec compteurs ; recherche toujours visible (nom, chambre, unité) ; seuil de batterie unique. |
+| 19 | Résidents désactivés | Section séparée « En pause / suivi désactivé », exclus des compteurs d'alerte. |
+| 20 | Pop-up multi-résidents | Liste toutes les alarmes en cours, avec photo, chambre, distance, « depuis X min » et boutons par résident. |
+| 21 | Bandeau compact | Trié par heure de sortie, « Sorti(e) depuis X min », repliable. |
+| 22 | Couper le son | Par résident (« Alarme de Jeanne coupée — 1 autre alarme en cours ») ou « Couper tout ». |
+| 23 | Notifications regroupées | Groupe + notification de synthèse (« 3 résidents hors zone »). |
+| 24 | « Je m'en occupe » | Bouton dans la pop-up, le bandeau, la carte et la notification ; nom du soignant affiché à toute l'équipe sur ce téléphone et tracé dans le journal. |
+| 25 | Carte : initiales / regroupement | Marqueurs avec photo ou initiales et anneau de couleur du statut ; regroupement des marqueurs proches (sauf hors zone). |
+| 26 | Carte : pas de position inventée | Les résidents sans position ne sont plus dessinés (liste « sans position » à part) ; résidents désactivés masqués. |
+| 27 | Carte : sélection | Résident sélectionné mis en évidence, bouton « hors zone suivant », bouton « tout afficher ». |
+| 28 | Comptes Weenect | Écran de gestion des comptes ; dans la fiche, choix du compte puis de la balise dans la liste ; avertissement si la balise est déjà associée. |
+| 29 | Sortie accompagnée | Pour un résident (menu) ou plusieurs (appui long → sélection) ; durée au choix, motif ; reprise automatique et alarme si le résident n'est pas rentré. |
+| 30 | Unité / risque | Champs « Unité / étage » et « Niveau de vigilance » ; regroupement par unité ; tri par risque. |
+| 31 | Interrogation parallèle | 4 balises à la fois. |
+
+## Ergonomie, esthétique, technique, nouvelles fonctions
+
+| # | Point | Ce qui a été fait |
+|---|---|---|
+| 32 | Mode sombre | Couleurs de statut adaptées au thème + couleurs « pleines » pour les fonds avec texte blanc (vérifié sur captures). |
+| 33 | Valeurs en dur | Plus de « MAS l'Épeau », d'adresse ni d'e-mail codés en dur ; plus de renommage forcé de la zone. |
+| 34 | Suppression | Confirmation obligatoire. |
+| 35 | Mode exercice | Les simulations ne modifient plus le résident, sont marquées « EXERCICE » et ne comptent pas dans le badge. |
+| 36 | Journal | Nom et heure d'acquittement, filtres, confirmation de « Tout acquitter », purge (manuelle à 90 j, automatique à 180 j) ; retours en zone hors badge. |
+| 37 | Photo | Choix d'une photo (réduite et stockée dans l'app), affichée partout et dans la notification. |
+| 38 | Initiales | « Jean Dupont » → « JD ». |
+| 39 | Lisibilité | Textes à 12 sp minimum, boutons ≥ 44–48 dp. |
+| 40 | Petits défauts | État des autorisations rafraîchi au retour des réglages ; onglet conservé à la rotation ; « distance à la limite » en zone polygonale. |
+| 41 | Ménage | Firebase, App Check, Coil, Navigation, secrets/google-services, Gemini et le logo en double retirés. |
+| 42 | Release | Minification R8 active (APK release ≈ 2 Mo) ; package renommé **`fr.alerteresidents`**. |
+| 43 | HTTP | Un client OkHttp partagé, en-têtes Weenect centralisés, Moshi sans réflexion. |
+| 44 | État de la surveillance | Nouvel écran : service, réglages du téléphone (avec « Corriger »), état de chaque balise, **prise de poste** tracée dans le journal. |
+| 45 | Plages horaires / zones | Zones annexes (jardin, parking…) autorisées le jour et/ou la nuit ; mode nuit avec intervalle de vérification dédié. |
+| 47 | Trajet | Trajet des 2 h / 6 h dans la carte. |
+| 48 | Export journal | PDF et CSV (Excel) de l'affichage courant. |
+| 49 | Code PIN | Protection des Paramètres (empreinte salée), reverrouillage après 2 min en arrière-plan. |
+
+## ⚠️ À savoir avant d'installer la version 2.0
+
+- **Nouveau nom de package (`fr.alerteresidents`)** : Android l'installe comme une **nouvelle application**, à côté de l'ancienne. Pour récupérer la configuration : dans l'ancienne app, *Paramètres › Exporter* ; dans la nouvelle, *Importer* le fichier (l'ancien format avec mots de passe en clair est reconnu et ses mots de passe sont chiffrés à l'import), puis désinstaller l'ancienne. Si tu préfères garder l'ancien identifiant, il suffit de remettre `applicationId` dans `app/build.gradle.kts`.
+- Après installation : ouvrir **État de la surveillance** et corriger ce qui est en rouge (notifications, plein écran, batterie).
+- Non testé sur un vrai téléphone (pas d'émulateur disponible ici) : les écrans ont été rendus et testés sous Robolectric, mais un test réel (alarme écran verrouillé, sortie de zone avec une vraie balise) reste indispensable avant usage en production.
+
+## Tests (version 2.0)
+
+**85 tests, 0 échec** (`./gradlew testDebugUnitTest`, ~1 min 30) :
+
+| Fichier | Contenu |
+|---|---|
+| `WeenectRepositoryTest` (31) | Moteur complet avec Room + faux serveur Weenect : sorties, retours, échecs (mot de passe, balise absente, coordonnées vides, erreur serveur), fraîcheur du fix, hystérésis, rappels, prise en charge, « retrouvé », sortie accompagnée, batterie, concurrence, chiffrement, migration des identifiants, commandes, exercices, zones annexes / nuit, trajet |
+| `ZoneEvaluatorTest`, `ZoneTransitionTest`, `ResidentStatusResolverTest` | Logique pure : zones, transitions, statuts et tri par urgence |
+| `MigrationTest` | Migration de base v3 → v4 sans perte |
+| `ConfigBackupManagerTest`, `PassphraseCryptoTest`, `DateParsingTest`, `GeoUtilsTest`, `FacilityZoneTest` | Export/import (v1 et v2), chiffrement, PIN, dates, géométrie |
+| `UiSmokeTest` / `UiSmokeDarkTest` | Rendu réel de 11 écrans et dialogues avec 8 résidents dans tous les états, en clair et en sombre ; captures dans `app/build/ui-screenshots/` (aperçu dans `docs/captures/`) |
+
+Android Lint : 0 erreur.
