@@ -75,6 +75,17 @@ data class CloudState(
 ) {
     fun onlineDevices(now: Long): List<CloudDevice> = devices.filter { (it.lastSeenAt ?: 0) > now - ONLINE_MS }
 
+    /**
+     * Appareils à afficher : une ancienne installation (réinstallation de l'app, téléphone
+     * réinitialisé) hors ligne et du même nom qu'un appareil en ligne n'est pas répétée.
+     */
+    fun displayedDevices(now: Long): List<CloudDevice> {
+        val online = onlineDevices(now)
+        return devices.filter { d ->
+            d in online || online.none { it.name.equals(d.name, ignoreCase = true) && it.platform == d.platform }
+        }
+    }
+
     companion object {
         const val ONLINE_MS = 2 * 60_000L
     }

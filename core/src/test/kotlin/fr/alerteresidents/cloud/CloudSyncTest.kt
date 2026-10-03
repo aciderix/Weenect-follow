@@ -381,6 +381,7 @@ class CloudSyncTest {
     @Test
     fun `fiche ajoutee ici - envoyee une seule fois puis a chaque modification`() = runBlocking {
         connect()
+        store.zoneValue = FacilityZone(name = "MAS Les Tilleuls", radiusMeters = 180.0)
         sync.syncOnce()
         val pushed = rpcCalls("save_resident").single().second
         assertTrue(pushed.contains("\"name\":\"Jeanne\""))
@@ -493,5 +494,36 @@ class CloudSyncTest {
         syncBody = state("""[{"id":"inc-x","tracker_id":555,"resident_name":"Marcel","status":"handling","handled_by":"Marc"}]""")
         sync.syncOnce()
         assertNull(alarms.alarmStartedAt(ghostId))
+    }
+    @Test
+    fun `appareil neuf - sa zone vierge n est pas partagee`() = runBlocking {
+        connect()
+        store.residents.clear()
+        sync.syncOnce()
+        assertTrue(rpcCalls("save_zone").isEmpty())
+    }
+
+    @Test
+    fun `zone vierge partagee par erreur - n ecrase pas la vraie zone, qui est partagee a la place`() = runBlocking {
+        connect()
+        store.zoneValue = FacilityZone(name = "MAS Les Tilleuls", centerLatitude = 45.7, centerLongitude = 4.8, radiusMeters = 220.0)
+        configBody = config(
+            zone = """{"name":"Mon établissement","centerLatitude":47.1787,"centerLongitude":-1.6192,"radiusMeters":150.0}""",
+            zoneAt = "\"2026-10-03T07:28:32+00:00\""
+        )
+        sync.syncOnce()
+        assertEquals("MAS Les Tilleuls", store.zoneValue.name)
+        assertTrue(rpcCalls("save_zone").single().second.contains("MAS Les Tilleuls"))
+    }
+
+    @Test
+    fun `reinstallation - l ancienne installation hors ligne n apparait pas en double`() {
+        val now = System.currentTimeMillis()
+        val state = CloudState(devices = listOf(
+            CloudDevice("old", "Karim", "android", true, 1, now - 6 * 3_600_000L, false),
+            CloudDevice("new", "Karim", "android", true, 0, now - 5_000L, true),
+            CloudDevice("pc", "PC cadre", "windows", true, 3, now - 3 * 3_600_000L, false)
+        ))
+        assertEquals(listOf("new", "pc"), state.displayedDevices(now).map { it.id })
     }
 }

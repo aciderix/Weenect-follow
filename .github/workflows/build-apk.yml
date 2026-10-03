@@ -23,6 +23,7 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
+      # Clé de test partagée du dépôt (debug.keystore.base64) : même signature pour tous les builds.
       - name: Ensure debug keystore exists
         run: |
           if [ -f "debug.keystore.base64" ]; then

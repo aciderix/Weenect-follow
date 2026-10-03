@@ -286,6 +286,9 @@ internal class ConfigSync(
         val known = snapshot[ZONE]
         if (known != null && known != hash(local)) return // modifiée ici : envoyée ensuite
         val zone = runCatching { BackupCodec.zoneFromMap(remote) }.getOrNull() ?: return
+        // Une zone jamais configurée (valeurs d'usine) ne remplace pas une vraie zone : la zone
+        // locale sera partagée à la place.
+        if (isFactoryDefault(zone) && !isFactoryDefault(local)) return
         if (zone.copy(id = local.id) != local) config.saveZone(zone.copy(id = local.id))
         snapshot[ZONE] = hash(zone.copy(id = local.id))
         zoneStamp = dto.zoneUpdatedAt
@@ -295,10 +298,19 @@ internal class ConfigSync(
         val local = config.zone()
         val h = hash(local)
         if (snapshot[ZONE] == h) return
+        // Appareil neuf : sa zone d'usine n'a rien à partager.
+        if (isFactoryDefault(local)) return
         if (snapshot[ZONE] == null && zoneStamp != null) return // zone partagée appliquée à ce cycle
         val raw = c.rpc("save_zone", mapOf("p_zone" to BackupCodec.zoneToMap(local), "p_by" to by), token)
         snapshot[ZONE] = h
         zoneStamp = runCatching { stringAdapter.fromJson(raw) }.getOrNull() ?: zoneStamp
+    }
+
+    /** Zone jamais configurée : valeurs de l'installation (nom, centre et rayon par défaut). */
+    private fun isFactoryDefault(z: FacilityZone): Boolean {
+        val d = FacilityZone()
+        return z.name == d.name && z.centerLatitude == d.centerLatitude && z.centerLongitude == d.centerLongitude &&
+            z.radiusMeters == d.radiusMeters && z.polygonPointsJson.isBlank() && z.extraZonesJson.isBlank()
     }
 
     // ------------------------------------------------------------------------------------------

@@ -79,11 +79,12 @@ fun CloudStatusLine(cloud: CloudState, now: Long) {
 @Composable
 fun CloudDevicesList(cloud: CloudState, now: Long) {
     val online = cloud.onlineDevices(now)
+    val shown = cloud.displayedDevices(now)
     Text(
-        "${online.size} appareil(s) en ligne" + if (cloud.devices.size > online.size) " • ${cloud.devices.size - online.size} hors ligne" else "",
+        "${online.size} appareil(s) en ligne" + if (shown.size > online.size) " • ${shown.size - online.size} hors ligne" else "",
         fontSize = 14.sp, fontWeight = FontWeight.SemiBold
     )
-    cloud.devices.sortedWith(compareByDescending<fr.alerteresidents.cloud.CloudDevice> { it.isThisDevice }.thenBy { it.name }).forEach { d ->
+    shown.sortedWith(compareByDescending<fr.alerteresidents.cloud.CloudDevice> { it.isThisDevice }.thenBy { it.name }).forEach { d ->
         val isOnline = (d.lastSeenAt ?: 0) > now - CloudState.ONLINE_MS
         val color = when {
             !isOnline -> MaterialTheme.colorScheme.outline
@@ -210,6 +211,7 @@ private fun CloudConnectDialog(viewModel: ResidentViewModel, cloud: CloudState, 
     var email by remember { mutableStateOf(cloud.email.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var deviceName by remember { mutableStateOf(cloud.deviceName ?: viewModel.cloudDefaultDeviceName) }
+    var staffName by remember { mutableStateOf(viewModel.prefs.staffName.value) }
     var passphrase by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -233,7 +235,11 @@ private fun CloudConnectDialog(viewModel: ResidentViewModel, cloud: CloudState, 
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(deviceName, { deviceName = it.take(40) }, label = { Text("Nom de cet appareil") },
+                    supportingText = { Text("Affiché dans la liste des appareils et dans « Signalé par » (ex. PC infirmerie).") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(staffName, { staffName = it.take(40) }, label = { Text("Nom du soignant sur cet appareil") },
+                    supportingText = { Text("Affiché sur « Pris en charge par … » chez tous les autres. Modifiable dans Paramètres › Ce poste.") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth().testTag("cloud_staff_name"))
                 OutlinedTextField(passphrase, { passphrase = it }, label = { Text("Phrase secrète de l'établissement (facultatif)") },
                     supportingText = { Text("Pour partager les mots de passe Weenect. Même phrase sur tous les appareils.") },
                     singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
@@ -247,6 +253,7 @@ private fun CloudConnectDialog(viewModel: ResidentViewModel, cloud: CloudState, 
                     busy = true
                     error = null
                     scope.launch {
+                        if (staffName.trim() != viewModel.prefs.staffName.value) viewModel.setStaffName(staffName.trim())
                         val r = viewModel.connectCloud(url, key, email, password, deviceName)
                         if (r.isFailure) {
                             busy = false

@@ -84,7 +84,7 @@ Cette clé est faite pour être mise dans une application. Seule, elle ne donne 
 ⚠️ Ne mettez **jamais** la clé `service_role` / `secret` dans l'app.
 
 ### 7. Connecter chaque appareil
-Dans l'app, sur Android comme sur Windows : **Paramètres › Partage entre appareils › Connecter à Supabase**. Renseignez l'adresse, la clé publique, l'e-mail, le mot de passe, un nom d'appareil parlant (« PC cadre de santé ») et la **phrase secrète de l'établissement** (voir l'étape 8).
+Dans l'app, sur Android comme sur Windows : **Paramètres › Partage entre appareils › Connecter à Supabase**. Renseignez l'adresse, la clé publique, l'e-mail, le mot de passe, un nom d'appareil parlant (« PC cadre de santé »), le **nom du soignant** de cet appareil (affiché sur « Pris en charge par … ») et la **phrase secrète de l'établissement** (voir l'étape 8).
 Le mot de passe n'est pas conservé. Seul un jeton de session est gardé, chiffré par le Keystore Android ou par la protection de session Windows.
 
 Commencez par l'appareil déjà configuré, celui qui a la zone, les comptes et les résidents : il les partage automatiquement. Les appareils suivants les reçoivent en quelques secondes. S'ils avaient déjà des résidents, ceux-ci sont rattachés aux fiches partagées de même balise, sans doublon.

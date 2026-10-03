@@ -2,6 +2,7 @@ package fr.alerteresidents.desktop
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.onAllNodesWithText
@@ -80,5 +81,19 @@ class AppContentUiTest {
         assertTextShown("Test d'alarme")
         screenshot("alarme") { onRoot().captureToImage().toAwtImage() }
         app.alarms.stopAlarm()
+    }
+    @Test
+    fun `fenetre de connexion - nom de l appareil et nom du soignant pre-remplis`() = runDesktopComposeUiTest(1400, 900) {
+        val app = app().apply { preferences.setStaffName("Paula") }
+        val vm = ResidentViewModel(app)
+        setContent { MyApplicationTheme { AppContent(vm) } }
+        waitForIdle()
+        onNodeWithTag("nav_Paramètres").performClick()
+        waitForIdle()
+        onNodeWithTag("cloud_connect_button").performScrollTo().performClick()
+        waitForIdle()
+        assertTextShown("Nom du soignant sur cet appareil")
+        assertTextShown("Nom de cet appareil")
+        onNodeWithTag("cloud_staff_name").assertTextContains("Paula")
     }
 }

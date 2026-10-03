@@ -7,8 +7,9 @@ name: Release
 # Construit l'APK Android et l'installateur Windows, puis crée la release GitHub avec les
 # notes de la section correspondante de CHANGELOG.md.
 #
-# Signature Android (recommandée, sinon l'APK est signé avec une clé de debug jetable et
-# ne pourra pas être mis à jour par-dessus une version précédente) — secrets du dépôt :
+# Signature Android : sans secrets, l'APK est signé avec la clé de test partagée du dépôt
+# (debug.keystore.base64), stable d'une version à l'autre. Pour une clé privée (recommandé
+# avant un déploiement large) — secrets du dépôt :
 #   ANDROID_KEYSTORE_BASE64  keystore encodé en base64 (alias « upload »)
 #   ANDROID_STORE_PASSWORD   mot de passe du keystore
 #   ANDROID_KEY_PASSWORD     mot de passe de la clé
@@ -57,9 +58,10 @@ jobs:
             echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
             echo "signed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::Pas de clé de signature : APK de debug (non mis à jour par-dessus une autre version)."
-            keytool -genkey -keystore debug.keystore -keyalg RSA -keysize 2048 -validity 10000 \
-              -alias androiddebugkey -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
+            # Clé de test partagée du dépôt : stable d'une version à l'autre, les mises à jour
+            # s'installent par-dessus sans désinstaller (donc sans perdre les données).
+            echo "::warning::Pas de clé de release : APK signé avec la clé de test partagée du dépôt."
+            base64 -d debug.keystore.base64 > debug.keystore
             echo "signed=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -144,7 +146,7 @@ jobs:
             echo "Installation et configuration : voir le [README](https://github.com/${GITHUB_REPOSITORY}#readme)."
             if [ "${{ needs.android.outputs.signed }}" != "true" ]; then
               echo
-              echo "> ⚠️ APK signé avec une clé de test : désinstallez la version précédente avant d'installer celle-ci (les données locales seront perdues ; exportez la configuration avant)."
+              echo "> ℹ️ APK signé avec la clé de test partagée du dépôt : il s'installe par-dessus les versions signées avec cette même clé (à partir de 2.1.1) sans perdre les données."
             fi
           } >> notes.md
           cat notes.md

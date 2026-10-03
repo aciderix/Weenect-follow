@@ -2,6 +2,18 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Les versions suivent [SemVer](https://semver.org/lang/fr/).
 
+## [2.1.1] — 2026-10-03
+
+### Corrections
+- **Mises à jour sans désinstaller** : les APK sont désormais tous signés avec la même clé (clé de test partagée du dépôt). Une nouvelle version s'installe par-dessus l'ancienne et conserve résidents, réglages et journal. Auparavant, chaque build avait sa propre clé : il fallait désinstaller, ce qui effaçait les données.
+- **Zone vierge** : un appareil neuf ne partage plus sa zone d'usine (« Mon établissement »). Une zone vierge déjà partagée n'écrase plus la vraie zone d'un appareil configuré : c'est la vraie zone qui est partagée à la place.
+- **Appareils en double** : après une réinstallation, l'ancienne installation hors ligne n'apparaît plus à côté de la nouvelle dans « Partage entre appareils ».
+
+### Amélioration
+- La fenêtre de connexion à Supabase demande aussi le **nom du soignant** de l'appareil, pré-rempli et modifiable. C'est lui qui s'affiche sur « Pris en charge par … » chez les autres.
+
+> La 2.1.1 doit encore être installée après désinstallation de la 2.1.0 (clé différente). Les versions suivantes s'installeront par-dessus.
+
 ## [2.1.0] — 2026-10-03
 
 ### Synchronisation automatique des résidents (Supabase)
@@ -51,5 +63,6 @@ Première version publiée : refonte complète après audit, application Windows
 - Sirène intégrée (« Alarme détecteur de fumée 3 », La Sonothèque).
 - Plus de 110 tests automatisés : moteur, migration, chiffrement, partage, rendu des écrans.
 
+[2.1.1]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.1
 [2.1.0]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.0
 [2.0.0]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.0.0
