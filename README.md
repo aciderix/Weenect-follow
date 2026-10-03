@@ -210,11 +210,11 @@ flowchart LR
 
 1. Mettez à jour `versionName` / `versionCode` (`app/build.gradle.kts`), `packageVersion` (`desktop/build.gradle.kts`) et [CHANGELOG.md](CHANGELOG.md).
 2. `git tag v2.1.0 && git push origin v2.1.0`, ou sur GitHub **Actions › Release › Run workflow** en saisissant `2.1.0`. Le workflow **Release** crée le tag si besoin, puis construit et publie l'APK et le MSI.
-3. **Signature Android** (fortement recommandée, pour pouvoir mettre l'app à jour sans la désinstaller) : créez une clé une fois.
+3. **Signature Android** : par défaut, les APK sont signés avec la **clé de test partagée** du dépôt (`debug.keystore.base64`). Elle est stable d'une version à l'autre, donc une mise à jour s'installe par-dessus la précédente sans désinstaller ni perdre les données. Comme cette clé est publique, n'importe qui pourrait signer un APK installable par-dessus. Avant un déploiement large, passez à une **clé privée** :
    ```bash
    keytool -genkey -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
    ```
-   Ajoutez ensuite les secrets du dépôt `ANDROID_KEYSTORE_BASE64` (sortie de `base64 -w0 upload.jks`), `ANDROID_STORE_PASSWORD` et `ANDROID_KEY_PASSWORD`. Conservez précieusement le fichier `upload.jks` : sans lui, impossible de publier une mise à jour installable par-dessus.
+   Ajoutez ensuite les secrets du dépôt `ANDROID_KEYSTORE_BASE64` (sortie de `base64 -w0 upload.jks`), `ANDROID_STORE_PASSWORD` et `ANDROID_KEY_PASSWORD`. Changer de clé oblige à désinstaller l'app une dernière fois sur chaque téléphone ; avec le partage Supabase, résidents, comptes et zone reviennent seuls. Conservez précieusement `upload.jks` : sans lui, impossible de publier une mise à jour installable par-dessus.
 
 ## Documentation
 

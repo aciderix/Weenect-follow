@@ -79,11 +79,12 @@ fun CloudStatusLine(cloud: CloudState, now: Long) {
 @Composable
 fun CloudDevicesList(cloud: CloudState, now: Long) {
     val online = cloud.onlineDevices(now)
+    val shown = cloud.displayedDevices(now)
     Text(
-        "${online.size} appareil(s) en ligne" + if (cloud.devices.size > online.size) " • ${cloud.devices.size - online.size} hors ligne" else "",
+        "${online.size} appareil(s) en ligne" + if (shown.size > online.size) " • ${shown.size - online.size} hors ligne" else "",
         fontSize = 14.sp, fontWeight = FontWeight.SemiBold
     )
-    cloud.devices.sortedWith(compareByDescending<fr.alerteresidents.cloud.CloudDevice> { it.isThisDevice }.thenBy { it.name }).forEach { d ->
+    shown.sortedWith(compareByDescending<fr.alerteresidents.cloud.CloudDevice> { it.isThisDevice }.thenBy { it.name }).forEach { d ->
         val isOnline = (d.lastSeenAt ?: 0) > now - CloudState.ONLINE_MS
         val color = when {
             !isOnline -> MaterialTheme.colorScheme.outline
