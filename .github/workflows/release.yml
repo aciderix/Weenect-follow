@@ -1,7 +1,9 @@
 name: Release
 
-# Publie une version quand un tag « vX.Y.Z » est poussé :
-#   git tag v2.0.0 && git push origin v2.0.0
+# Publie une version, au choix :
+#   - en poussant un tag :            git tag v2.0.0 && git push origin v2.0.0
+#   - depuis GitHub : Actions › Release › Run workflow, version « 2.0.0 » (le tag v2.0.0 est
+#     alors créé sur le commit choisi)
 # Construit l'APK Android et l'installateur Windows, puis crée la release GitHub avec les
 # notes de la section correspondante de CHANGELOG.md.
 #
@@ -14,6 +16,15 @@ name: Release
 on:
   push:
     tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à publier, sans le v (ex. 2.0.0) — doit avoir sa section dans CHANGELOG.md"
+        required: true
+
+env:
+  # Version sans le « v » : depuis le tag poussé, ou depuis la saisie manuelle.
+  VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
 
 permissions:
   contents: write
@@ -59,7 +70,7 @@ jobs:
 
       - name: Build APK
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION#v}"
           mkdir -p dist
           if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
             ./gradlew assembleRelease --stacktrace
@@ -88,7 +99,7 @@ jobs:
         shell: bash
         run: |
           ./gradlew :desktop:packageMsi --stacktrace
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION#v}"
           mkdir -p dist
           cp desktop/build/compose/binaries/main/msi/*.msi "dist/AlerteResidents-$VERSION-windows.msi"
       - uses: actions/upload-artifact@v4
@@ -109,7 +120,7 @@ jobs:
 
       - name: Release notes
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION#v}"
           # Section « ## [VERSION] » de CHANGELOG.md, jusqu'à la section suivante
           awk -v v="$VERSION" '
             $0 ~ "^## \\[" v "\\]" { on = 1; next }
@@ -117,6 +128,10 @@ jobs:
             on && /^\[[^]]+\]: / { next }
             on { print }
           ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::Aucune section [$VERSION] dans CHANGELOG.md"
+            exit 1
+          fi
           {
             echo
             echo "## Téléchargements"
@@ -138,8 +153,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" dist/* \
+          VERSION="${VERSION#v}"
+          # Tag poussé : la release s'y rattache. Lancement manuel : le tag est créé sur ce commit.
+          gh release create "v$VERSION" dist/* \
+            --target "$GITHUB_SHA" \
             --title "Alerte Résidents $VERSION" \
-            --notes-file notes.md \
-            --verify-tag
+            --notes-file notes.md

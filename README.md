@@ -208,7 +208,7 @@ flowchart LR
 ### Publier une version
 
 1. Mettez à jour `versionName` / `versionCode` (`app/build.gradle.kts`), `packageVersion` (`desktop/build.gradle.kts`) et [CHANGELOG.md](CHANGELOG.md).
-2. `git tag v2.1.0 && git push origin v2.1.0`. Le workflow **Release** construit et publie l'APK et le MSI.
+2. `git tag v2.1.0 && git push origin v2.1.0`, ou sur GitHub **Actions › Release › Run workflow** en saisissant `2.1.0`. Le workflow **Release** crée le tag si besoin, puis construit et publie l'APK et le MSI.
 3. **Signature Android** (fortement recommandée, pour pouvoir mettre l'app à jour sans la désinstaller) : créez une clé une fois.
    ```bash
    keytool -genkey -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
