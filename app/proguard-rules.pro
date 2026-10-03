@@ -1,21 +1,19 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Règles R8 pour la version release (minification activée).
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Garder les numéros de ligne dans les traces d'erreur, sans exposer les noms de fichiers source.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Retrofit : les interfaces d'API sont lues par réflexion (règles fournies par Retrofit, renforcées ici).
+-keep,allowobfuscation,allowshrinking interface fr.alerteresidents.data.remote.WeenectApiService
+-keepattributes Signature, InnerClasses, EnclosingMethod, RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Moshi (adaptateurs générés par moshi-kotlin-codegen) : les DTO Weenect.
+-keep class fr.alerteresidents.data.model.Weenect*Dto { *; }
+-keep class fr.alerteresidents.data.model.Weenect*Response { *; }
+-keep class fr.alerteresidents.data.model.Weenect*Request { *; }
+
+# OkHttp : plateformes TLS optionnelles absentes sur Android.
+-dontwarn org.bouncycastle.jsse.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**

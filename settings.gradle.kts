@@ -25,3 +25,5 @@ dependencyResolutionManagement {
 rootProject.name = "Alerte Résidents"
 
 include(":app")
+include(":core")
+include(":desktop")
