@@ -2,6 +2,11 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Les versions suivent [SemVer](https://semver.org/lang/fr/).
 
+## [2.1.2] — 2026-10-03
+
+### Correction
+- Notification permanente : un résident en sortie accompagnée n'est plus « oublié ». Elle affichait « 🟢 0 résident(s) en sécurité » quand le seul résident était en sortie ; elle affiche maintenant « ⏸️ 1 résident(s) en sortie accompagnée : surveillance de zone suspendue », et ajoute « • N en sortie accompagnée » au décompte habituel.
+
 ## [2.1.1] — 2026-10-03
 
 ### Corrections
@@ -63,6 +68,7 @@ Première version publiée : refonte complète après audit, application Windows
 - Sirène intégrée (« Alarme détecteur de fumée 3 », La Sonothèque).
 - Plus de 110 tests automatisés : moteur, migration, chiffrement, partage, rendu des écrans.
 
+[2.1.2]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.2
 [2.1.1]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.1
 [2.1.0]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.0
 [2.0.0]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.0.0

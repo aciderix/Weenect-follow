@@ -62,3 +62,23 @@ object ResidentStatusResolver {
         }
     }
 }
+
+/** Texte de la notification permanente de surveillance (état réel, sans résident oublié). */
+object MonitoringSummary {
+    fun ongoingText(statuses: List<ResidentStatus>, allFailed: Boolean, night: Boolean): String {
+        val out = statuses.count { it == ResidentStatus.OUT }
+        val unknown = statuses.count { it == ResidentStatus.UNKNOWN || it == ResidentStatus.STALE }
+        val safe = statuses.count { it == ResidentStatus.SAFE }
+        val paused = statuses.count { it == ResidentStatus.PAUSED }
+        val pausedPart = if (paused > 0) " • $paused en sortie accompagnée" else ""
+        val text = when {
+            out > 0 -> "🚨 $out résident(s) hors zone !" + (if (unknown > 0) " • $unknown sans position fiable" else "") + pausedPart
+            allFailed -> "⚠️ Surveillance dégradée : aucune balise joignable"
+            unknown > 0 -> "⚠️ $unknown résident(s) sans position fiable • $safe en sécurité$pausedPart"
+            safe == 0 && paused > 0 -> "⏸️ $paused résident(s) en sortie accompagnée : surveillance de zone suspendue"
+            safe == 0 -> "Aucun résident suivi"
+            else -> "🟢 $safe résident(s) en sécurité$pausedPart"
+        }
+        return text + if (night) " • mode nuit" else ""
+    }
+}
