@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.sp
 import fr.alerteresidents.cloud.CloudState
 import fr.alerteresidents.ui.theme.AppStatusColors
 import fr.alerteresidents.ui.viewmodel.ResidentViewModel
-import fr.alerteresidents.ui.viewmodel.SharedConfigPreview
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,7 +46,7 @@ import java.util.Locale
 
 /*
  * Partage entre appareils (Supabase). Fichier identique dans l'app Android et l'app Windows :
- * les deux ResidentViewModel exposent la même API (cloud, connectCloud, publishSharedConfig…).
+ * les deux ResidentViewModel exposent la même API (cloud, connectCloud, setCloudPassphrase…).
  */
 
 private fun ago(now: Long, at: Long?): String {
@@ -119,8 +118,7 @@ fun CloudSyncSection(viewModel: ResidentViewModel) {
     val cloud by viewModel.cloud.collectAsState()
     val now by viewModel.now.collectAsState()
     var showConnect by remember { mutableStateOf(false) }
-    var showPublish by remember { mutableStateOf(false) }
-    var showFetch by remember { mutableStateOf(false) }
+    var showPassphrase by remember { mutableStateOf(false) }
     var confirmDisconnect by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
 
@@ -129,7 +127,8 @@ fun CloudSyncSection(viewModel: ResidentViewModel) {
         if (!cloud.configured) {
             Text(
                 "Reliez les téléphones et PC de l'établissement à un projet Supabase : une sortie détectée par un appareil " +
-                    "sonne sur tous, et « Je m'en occupe » coupe l'alarme partout avec le nom du soignant. " +
+                    "sonne sur tous, « Je m'en occupe » coupe l'alarme partout avec le nom du soignant, et les résidents " +
+                    "ajoutés ou modifiés sur un appareil apparaissent automatiquement sur les autres. " +
                     "Mise en place : voir docs/SUPABASE.md dans le dépôt GitHub.",
                 fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -152,18 +151,22 @@ fun CloudSyncSection(viewModel: ResidentViewModel) {
             if (cloud.devices.isNotEmpty()) CloudDevicesList(cloud, now)
 
             Text(
-                "Configuration partagée : " + (cloud.configPublishedAt?.let {
-                    "publiée par ${cloud.configPublishedBy ?: "?"} le ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRENCH).format(Date(it))}"
-                } ?: "aucune"),
+                "Résidents, comptes Weenect et zone : synchronisés automatiquement" +
+                    if (cloud.sharedResidents > 0) " (${cloud.sharedResidents} résident(s) partagé(s))" else "",
                 fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { showPublish = true }, modifier = Modifier.weight(1f)) { Text("Publier ma config.", maxLines = 1) }
-                OutlinedButton(
-                    onClick = { showFetch = true },
-                    enabled = cloud.configPublishedAt != null,
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    when {
+                        cloud.passphraseNeeded -> "⚠️ Phrase secrète à saisir : des mots de passe Weenect partagés ne sont pas encore utilisables ici"
+                        cloud.passphraseSet -> "Phrase secrète de l'établissement : enregistrée ✓"
+                        else -> "Phrase secrète : non saisie (les mots de passe Weenect ne sont pas partagés)"
+                    },
+                    fontSize = 13.sp,
+                    color = if (cloud.passphraseNeeded) AppStatusColors.warning else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
-                ) { Text("Récupérer la config.", maxLines = 1) }
+                )
+                TextButton(onClick = { showPassphrase = true }) { Text(if (cloud.passphraseSet) "Changer" else "Saisir") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (cloud.needsLogin) Button(onClick = { showConnect = true }, modifier = Modifier.weight(1f)) { Text("Se reconnecter") }
@@ -173,8 +176,7 @@ fun CloudSyncSection(viewModel: ResidentViewModel) {
     }
 
     if (showConnect) CloudConnectDialog(viewModel, cloud) { showConnect = false }
-    if (showPublish) PublishConfigDialog(viewModel) { showPublish = false }
-    if (showFetch) FetchConfigDialog(viewModel) { showFetch = false }
+    if (showPassphrase) PassphraseDialog(viewModel) { showPassphrase = false }
     if (renaming) {
         var name by remember { mutableStateOf(cloud.deviceName.orEmpty()) }
         AlertDialog(
@@ -208,6 +210,7 @@ private fun CloudConnectDialog(viewModel: ResidentViewModel, cloud: CloudState, 
     var email by remember { mutableStateOf(cloud.email.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var deviceName by remember { mutableStateOf(cloud.deviceName ?: viewModel.cloudDefaultDeviceName) }
+    var passphrase by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -231,6 +234,9 @@ private fun CloudConnectDialog(viewModel: ResidentViewModel, cloud: CloudState, 
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(deviceName, { deviceName = it.take(40) }, label = { Text("Nom de cet appareil") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(passphrase, { passphrase = it }, label = { Text("Phrase secrète de l'établissement (facultatif)") },
+                    supportingText = { Text("Pour partager les mots de passe Weenect. Même phrase sur tous les appareils.") },
+                    singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
                 error?.let { Text(it, color = AppStatusColors.danger, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
             }
         },
@@ -242,8 +248,15 @@ private fun CloudConnectDialog(viewModel: ResidentViewModel, cloud: CloudState, 
                     error = null
                     scope.launch {
                         val r = viewModel.connectCloud(url, key, email, password, deviceName)
+                        if (r.isFailure) {
+                            busy = false
+                            error = r.exceptionOrNull()?.message ?: "Connexion impossible"
+                            return@launch
+                        }
+                        val p = if (passphrase.isNotBlank()) viewModel.setCloudPassphrase(passphrase) else Result.success(Unit)
                         busy = false
-                        if (r.isSuccess) onDismiss() else error = r.exceptionOrNull()?.message ?: "Connexion impossible"
+                        if (p.isSuccess) onDismiss()
+                        else error = "Connecté, mais " + (p.exceptionOrNull()?.message ?: "phrase secrète refusée").replaceFirstChar { it.lowercase() }
                     }
                 }
             ) {
@@ -255,103 +268,39 @@ private fun CloudConnectDialog(viewModel: ResidentViewModel, cloud: CloudState, 
 }
 
 @Composable
-private fun PublishConfigDialog(viewModel: ResidentViewModel, onDismiss: () -> Unit) {
+private fun PassphraseDialog(viewModel: ResidentViewModel, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val staff by viewModel.prefs.staffName.collectAsState()
     var passphrase by remember { mutableStateOf("") }
-    var confirm by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    val valid = passphrase.length >= 6 && passphrase == confirm
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Publier la configuration", fontWeight = FontWeight.Bold) },
+        title = { Text("Phrase secrète de l'établissement", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "La zone, les résidents et les comptes Weenect de cet appareil deviennent la configuration de référence. " +
-                        "Les mots de passe Weenect sont chiffrés ici par une phrase secrète avant l'envoi : Supabase ne peut pas les lire. " +
-                        "Communiquez la phrase de vive voix aux collègues qui récupéreront la configuration.",
+                    "Elle chiffre les mots de passe Weenect sur l'appareil avant de les partager : Supabase ne peut pas les lire. " +
+                        "Le premier appareil la choisit ; les autres doivent saisir exactement la même. " +
+                        "Transmettez-la de vive voix, jamais par écrit avec les identifiants.",
                     fontSize = 13.sp
                 )
                 OutlinedTextField(passphrase, { passphrase = it }, label = { Text("Phrase secrète (6 caractères min.)") }, singleLine = true,
                     visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(confirm, { confirm = it }, label = { Text("Confirmer la phrase") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
-                    isError = confirm.isNotEmpty() && confirm != passphrase)
                 error?.let { Text(it, color = AppStatusColors.danger, fontSize = 14.sp) }
             }
         },
         confirmButton = {
-            Button(enabled = valid && !busy, onClick = {
+            Button(enabled = passphrase.length >= 6 && !busy, onClick = {
                 busy = true
+                error = null
                 scope.launch {
-                    val r = viewModel.publishSharedConfig(passphrase, staff.ifBlank { viewModel.cloud.value.deviceName ?: "?" })
+                    val r = viewModel.setCloudPassphrase(passphrase)
                     busy = false
                     if (r.isSuccess) onDismiss() else error = r.exceptionOrNull()?.message
                 }
-            }) { if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Publier") }
+            }) { if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Enregistrer") }
         },
         dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("Annuler") } }
-    )
-}
-
-@Composable
-private fun FetchConfigDialog(viewModel: ResidentViewModel, onDismiss: () -> Unit) {
-    val scope = rememberCoroutineScope()
-    var preview by remember { mutableStateOf<SharedConfigPreview?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var passphrase by remember { mutableStateOf("") }
-
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        val r = viewModel.fetchSharedConfig()
-        loading = false
-        r.onSuccess { preview = it; if (it == null) error = "Aucune configuration publiée" }
-            .onFailure { error = it.message }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Récupérer la configuration partagée", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                when {
-                    loading -> CircularProgressIndicator()
-                    preview != null -> {
-                        val p = preview!!
-                        Text(
-                            "Publiée par ${p.publishedBy ?: "?"}" + (p.publishedAt?.let { " le " + SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRENCH).format(Date(it)) } ?: "") +
-                                " : ${p.data.residents.size} résident(s), zone « ${p.data.facilityZone.name} », ${p.data.accounts.size} compte(s) Weenect.",
-                            fontSize = 14.sp
-                        )
-                        if (p.data.hasEncryptedPasswords) {
-                            OutlinedTextField(passphrase, { passphrase = it }, label = { Text("Phrase secrète") }, singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-                        }
-                        Text(
-                            "« Fusionner » ajoute et met à jour sans rien supprimer ; « Remplacer » efface d'abord les résidents de cet appareil.",
-                            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                error?.let { Text(it, color = AppStatusColors.danger, fontSize = 14.sp) }
-            }
-        },
-        confirmButton = {
-            val p = preview
-            if (p != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        viewModel.importConfiguration(p.data, true, passphrase.ifBlank { null }); onDismiss()
-                    }) { Text("Remplacer") }
-                    Button(onClick = {
-                        viewModel.importConfiguration(p.data, false, passphrase.ifBlank { null }); onDismiss()
-                    }) { Text("Fusionner") }
-                }
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Fermer") } }
     )
 }

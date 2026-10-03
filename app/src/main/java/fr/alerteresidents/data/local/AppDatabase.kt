@@ -13,7 +13,7 @@ import fr.alerteresidents.data.model.WeenectAccount
 
 @Database(
     entities = [Resident::class, FacilityZone::class, AlertEvent::class, WeenectAccount::class],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -83,6 +83,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v4 → v5 : identifiant de synchronisation entre appareils (Supabase). */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE residents ADD COLUMN syncId TEXT")
+                db.execSQL("ALTER TABLE weenect_accounts ADD COLUMN syncId TEXT")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -107,7 +115,7 @@ abstract class AppDatabase : RoomDatabase() {
                             )
                         }
                     })
-                    .addMigrations(MIGRATION_3_4)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                     // Une montée de version sans migration doit faire échouer le build/les tests,
                     // jamais effacer silencieusement les résidents.
                     .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)

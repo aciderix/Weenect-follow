@@ -87,3 +87,42 @@ data class SyncStateDto(
     val devices: List<DeviceDto> = emptyList(),
     val config: ConfigMetaDto? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class RemoteResidentDto(
+    val id: String,
+    val name: String = "",
+    @Json(name = "room_number") val roomNumber: String = "",
+    val unit: String = "",
+    @Json(name = "avatar_color") val avatarColor: String = "#1E88E5",
+    @Json(name = "tracker_id") val trackerId: Long? = null,
+    @Json(name = "tracker_name") val trackerName: String? = null,
+    @Json(name = "account_id") val accountId: String? = null,
+    @Json(name = "emergency_contact") val emergencyContact: String = "",
+    val notes: String = "",
+    @Json(name = "risk_level") val riskLevel: Int = 0,
+    @Json(name = "is_tracking_active") val isTrackingActive: Boolean = true,
+    val removed: Boolean = false,
+    @Json(name = "updated_by") val updatedBy: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class RemoteAccountDto(
+    val id: String,
+    val label: String = "",
+    val username: String = "",
+    @Json(name = "password_enc") val passwordEnc: String? = null,
+    val removed: Boolean = false,
+    @Json(name = "updated_at") val updatedAt: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ConfigSyncDto(
+    val now: String? = null,
+    val residents: List<RemoteResidentDto> = emptyList(),
+    val accounts: List<RemoteAccountDto> = emptyList(),
+    val zone: Map<String, Any?>? = null,
+    @Json(name = "zone_updated_at") val zoneUpdatedAt: String? = null,
+    @Json(name = "passphrase_check") val passphraseCheck: String? = null
+)

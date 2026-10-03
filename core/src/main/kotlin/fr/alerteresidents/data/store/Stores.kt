@@ -3,6 +3,7 @@ package fr.alerteresidents.data.store
 import fr.alerteresidents.data.model.AlertEvent
 import fr.alerteresidents.data.model.FacilityZone
 import fr.alerteresidents.data.model.Resident
+import fr.alerteresidents.data.model.ResidentProfile
 import fr.alerteresidents.data.model.ResidentTracking
 import fr.alerteresidents.data.model.WeenectAccount
 
@@ -34,4 +35,22 @@ interface AccountStore {
     suspend fun insert(account: WeenectAccount): Long
     suspend fun update(account: WeenectAccount)
     suspend fun delete(account: WeenectAccount)
+}
+
+/** Fiches, comptes et zone : lus et écrits par la synchronisation automatique entre appareils. */
+interface ConfigStore {
+    suspend fun residents(): List<Resident>
+    suspend fun insertResident(resident: Resident): Long
+    suspend fun updateProfile(profile: ResidentProfile)
+    suspend fun setResidentSyncId(id: Long, syncId: String)
+    suspend fun removeResident(id: Long)
+
+    suspend fun accounts(): List<WeenectAccount>
+    suspend fun insertAccount(account: WeenectAccount): Long
+    suspend fun updateAccount(account: WeenectAccount)
+    /** Supprime le compte et détache les résidents qui l'utilisaient. */
+    suspend fun removeAccount(account: WeenectAccount)
+
+    suspend fun zone(): FacilityZone
+    suspend fun saveZone(zone: FacilityZone)
 }

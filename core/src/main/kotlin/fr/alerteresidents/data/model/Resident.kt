@@ -66,7 +66,10 @@ data class Resident(
     val pauseReason: String? = null,
     val lowBatteryNotified: Boolean = false,
     val offlineNotified: Boolean = false,
-    val isInDeepSleep: Boolean = false
+    val isInDeepSleep: Boolean = false,
+    // --- v5 ---
+    /** Identifiant partagé entre appareils (synchronisation Supabase), null tant que non synchronisé. */
+    val syncId: String? = null
 ) {
     val hasPosition: Boolean get() = lastLatitude != null && lastLongitude != null
     val hasTracker: Boolean get() = trackerId != null && accountId != null

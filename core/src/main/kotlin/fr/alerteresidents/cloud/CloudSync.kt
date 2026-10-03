@@ -6,6 +6,7 @@ import fr.alerteresidents.data.model.FacilityZone
 import fr.alerteresidents.data.model.Resident
 import fr.alerteresidents.data.remote.SharedStateHooks
 import fr.alerteresidents.data.remote.WeenectRepository
+import fr.alerteresidents.data.store.ConfigStore
 import fr.alerteresidents.data.store.ResidentStore
 import fr.alerteresidents.data.store.ZoneStore
 import fr.alerteresidents.security.CredentialCipher
@@ -64,9 +65,13 @@ data class CloudState(
     /** La session ou l'autorisation doit être refaite par un humain (pas de nouvelle tentative utile). */
     val needsLogin: Boolean = false,
     val devices: List<CloudDevice> = emptyList(),
-    val configPublishedBy: String? = null,
-    val configPublishedAt: Long? = null,
-    val pendingChanges: Int = 0
+    val pendingChanges: Int = 0,
+    /** Nombre de fiches résidents partagées (synchronisées automatiquement). */
+    val sharedResidents: Int = 0,
+    /** Phrase secrète de l'établissement enregistrée sur cet appareil. */
+    val passphraseSet: Boolean = false,
+    /** Des mots de passe Weenect partagés attendent la phrase secrète pour être utilisés ici. */
+    val passphraseNeeded: Boolean = false
 ) {
     fun onlineDevices(now: Long): List<CloudDevice> = devices.filter { (it.lastSeenAt ?: 0) > now - ONLINE_MS }
 
@@ -74,8 +79,6 @@ data class CloudState(
         const val ONLINE_MS = 2 * 60_000L
     }
 }
-
-data class SharedConfig(val payload: String, val publishedBy: String?, val publishedAt: Long?)
 
 /**
  * Partage de l'état d'alerte entre les appareils d'un établissement via un projet Supabase
@@ -85,14 +88,16 @@ data class SharedConfig(val payload: String, val publishedBy: String?, val publi
  * - les actions faites ici (sortie détectée, « Je m'en occupe », retrouvé, sortie accompagnée)
  *   sont envoyées dans l'ordre (file d'attente rejouée tant que l'envoi échoue) ;
  * - toutes les [pollMs] l'état partagé est relu : une prise en charge ailleurs coupe l'alarme
- *   ici, une sortie détectée ailleurs fait sonner ici.
- * Les résidents sont reconnus d'un appareil à l'autre par l'identifiant de leur balise Weenect.
+ *   ici, une sortie détectée ailleurs fait sonner ici (même pour un résident pas encore connu ici) ;
+ * - les fiches résidents, comptes Weenect et la zone sont synchronisés automatiquement ([ConfigSync]).
+ * Les alertes reconnaissent un résident d'un appareil à l'autre par l'identifiant de sa balise.
  */
 class CloudSync(
     private val store: KeyValueStore,
     private val cipher: CredentialCipher,
     private val residents: ResidentStore,
     private val zones: ZoneStore,
+    config: ConfigStore,
     private val repository: WeenectRepository,
     private val alarms: CloudAlarmPort,
     private val platform: String,
@@ -111,7 +116,10 @@ class CloudSync(
     private val stateAdapter = moshi.adapter(SyncStateDto::class.java)
     private val incidentAdapter = moshi.adapter(IncidentDto::class.java)
     private val accessAdapter = moshi.adapter(AccessDto::class.java)
-    private val configAdapter = moshi.adapter(ConfigMetaDto::class.java)
+    private val configSync = ConfigSync(store, cipher, config)
+
+    /** Alarmes de résidents inconnus ici (id négatif → balise), signalés par un autre appareil. */
+    private val foreign = java.util.concurrent.ConcurrentHashMap<Long, Long>()
 
     private val _state = MutableStateFlow(CloudState())
     val state: StateFlow<CloudState> = _state.asStateFlow()
@@ -164,6 +172,7 @@ class CloudSync(
                         )
                     )
                 }
+                if (store.get(K_URL) != base) configSync.reset(clearPassphrase = true)
                 store.put(K_URL, base)
                 store.put(K_KEY, apiKey.trim())
                 store.put(K_EMAIL, s.email ?: email.trim())
@@ -187,11 +196,23 @@ class CloudSync(
     suspend fun disconnect() = mutex.withLock {
         session?.let { s -> client?.signOut(s.accessToken) }
         listOf(K_URL, K_KEY, K_EMAIL, K_REFRESH, K_DISPLAY_NAME).forEach { store.put(it, null) }
+        configSync.reset(clearPassphrase = true)
         client = null
         session = null
         synchronized(outboxLock) { outbox.clear() }
         openIncidents.clear()
         _state.value = CloudState()
+    }
+
+    /** Phrase secrète de l'établissement (partage des mots de passe Weenect), vérifiée auprès du projet. */
+    suspend fun setPassphrase(passphrase: String): Result<Unit> = mutex.withLock {
+        runCatching {
+            val (c, s) = ensureSession()
+            configSync.setPassphrase(c, s.accessToken, passphrase)
+            _state.value = _state.value.copy(passphraseSet = true, passphraseNeeded = false)
+            wake.trySend(Unit)
+            Unit
+        }
     }
 
     fun setDeviceName(name: String) {
@@ -232,6 +253,8 @@ class CloudSync(
         try {
             val (c, s) = ensureSession()
             flushOutbox(c, s)
+            // Fiches d'abord : un résident ajouté ailleurs est connu avant de lire les alertes.
+            configSync.sync(c, s.accessToken, staffName())
             val raw = c.rpc(
                 "sync_state",
                 mapOf(
@@ -256,8 +279,8 @@ class CloudSync(
                 devices = dto.devices.map {
                     CloudDevice(it.id, it.name, it.platform, it.monitoringOk, it.residentsCount, DateParsing.parseIso(it.lastSeenAt), it.id == deviceId)
                 },
-                configPublishedBy = dto.config?.publishedBy,
-                configPublishedAt = DateParsing.parseIso(dto.config?.publishedAt)
+                sharedResidents = configSync.sharedResidents,
+                passphraseNeeded = configSync.passphraseNeeded
             )
             true
         } catch (e: CancellationException) {
@@ -281,28 +304,24 @@ class CloudSync(
     }
 
     // ------------------------------------------------------------------------------------------
-    // Configuration partagée (export chiffré par la phrase secrète, voir BackupCodec)
+    // Alarmes de résidents inconnus sur cet appareil
     // ------------------------------------------------------------------------------------------
 
-    suspend fun publishConfig(payload: String, publishedBy: String): Result<Long> = mutex.withLock {
-        runCatching {
-            val (c, s) = ensureSession()
-            val raw = c.rpc("publish_config", mapOf("p_payload" to payload, "p_published_by" to publishedBy), s.accessToken)
-            val at = DateParsing.parseIso(raw.trim().trim('"')) ?: clock()
-            _state.value = _state.value.copy(configPublishedBy = publishedBy, configPublishedAt = at)
-            at
-        }
+    /** « Je m'en occupe » sur une alarme d'un résident inconnu ici. false si ce n'en est pas une. */
+    fun handleForeign(residentId: Long, staff: String): Boolean {
+        val tracker = foreign.remove(residentId) ?: return false
+        for (drill in drillFlags(tracker, localAlert = false)) enqueue(Op.Handle(tracker, drill, staff))
+        return true
     }
 
-    suspend fun fetchConfig(): Result<SharedConfig?> = mutex.withLock {
-        runCatching {
-            val (c, s) = ensureSession()
-            val raw = c.rpc("get_shared_config", emptyMap(), s.accessToken).trim()
-            if (raw == "null" || raw.isEmpty()) return@runCatching null
-            val dto = configAdapter.fromJson(raw) ?: return@runCatching null
-            dto.payload?.let { SharedConfig(it, dto.publishedBy, DateParsing.parseIso(dto.publishedAt)) }
-        }
+    /** « Retrouvé » sur une alarme d'un résident inconnu ici. false si ce n'en est pas une. */
+    fun resolveForeign(residentId: Long, staff: String): Boolean {
+        val tracker = foreign.remove(residentId) ?: return false
+        for (drill in drillFlags(tracker, localAlert = false)) enqueue(Op.Resolve(tracker, drill, staff, WeenectRepository.Resolution.FOUND))
+        return true
     }
+
+    private fun foreignId(tracker: Long) = FOREIGN_BASE - tracker
 
     // ------------------------------------------------------------------------------------------
     // Événements locaux → file d'envoi
@@ -394,7 +413,12 @@ class CloudSync(
             if (key in applied) continue
             // Une action locale sur cette balise n'est pas encore partie : on attend qu'elle le soit.
             if (inc.trackerId in pending) continue
-            for (r in byTracker[inc.trackerId].orEmpty()) {
+            // Une alarme « résident inconnu » a pu sonner avant que la fiche arrive : elle suit l'incident.
+            if (inc.status != IncidentDto.ACTIVE) stopForeignAlarm(inc)
+            val locals = byTracker[inc.trackerId].orEmpty()
+            if (locals.isEmpty()) {
+                onForeignIncident(inc, zone)
+            } else for (r in locals) {
                 when (inc.status) {
                     IncidentDto.ACTIVE -> onRemoteActive(inc, r, zone, now)
                     IncidentDto.HANDLING -> onRemoteHandling(inc, r)
@@ -416,6 +440,36 @@ class CloudSync(
         }
         trim(applied)
         trim(rung)
+    }
+
+    /**
+     * Sortie signalée pour une balise qu'aucun résident de cet appareil n'utilise (fiche pas encore
+     * reçue, ou résident non configuré ici) : on sonne quand même, avec le nom transmis.
+     */
+    private fun onForeignIncident(inc: IncidentDto, zone: FacilityZone) {
+        val id = foreignId(inc.trackerId)
+        when (inc.status) {
+            IncidentDto.ACTIVE -> {
+                if (inc.id in rung) return
+                rung += inc.id
+                foreign[id] = inc.trackerId
+                val ghost = Resident(
+                    id = id, name = inc.residentName.ifBlank { "Résident (balise ${inc.trackerId})" },
+                    roomNumber = "Non suivi sur cet appareil", trackerId = inc.trackerId, isInZone = false
+                )
+                alarms.ring(ghost, zone, inc.isDrill, inc.openedByDeviceName)
+            }
+            else -> stopForeignAlarm(inc)
+        }
+    }
+
+    private fun stopForeignAlarm(inc: IncidentDto) {
+        val id = foreignId(inc.trackerId)
+        foreign.remove(id)
+        if (alarms.alarmStartedAt(id) == null) return
+        alarms.stop(id)
+        val who = if (inc.status == IncidentDto.HANDLING) inc.handledBy else inc.resolvedBy
+        alarms.info("${inc.residentName} : alerte prise en main", "Par ${who ?: "un soignant"} — alarme coupée sur cet appareil")
     }
 
     private suspend fun onRemoteActive(inc: IncidentDto, r: Resident, zone: FacilityZone, now: Long) {
@@ -510,7 +564,10 @@ class CloudSync(
         email = store.get(K_EMAIL),
         deviceName = deviceName(),
         displayName = store.get(K_DISPLAY_NAME),
-        pendingChanges = pendingCount()
+        pendingChanges = pendingCount(),
+        sharedResidents = configSync.sharedResidents,
+        passphraseSet = configSync.passphraseSet,
+        passphraseNeeded = configSync.passphraseNeeded
     )
 
     private fun publishConfigured() {
@@ -555,6 +612,8 @@ class CloudSync(
     }
 
     companion object {
+        /** Identifiants d'alarme des résidents inconnus ici : FOREIGN_BASE - balise (toujours négatifs). */
+        const val FOREIGN_BASE = -1_000_000L
         const val K_URL = "cloud.url"
         const val K_KEY = "cloud.key"
         const val K_EMAIL = "cloud.email"

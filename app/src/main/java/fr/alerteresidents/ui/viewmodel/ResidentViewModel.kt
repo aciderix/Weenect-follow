@@ -48,9 +48,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Configuration publiée par un autre appareil, prête à être importée. */
-data class SharedConfigPreview(val data: BackupData, val publishedBy: String?, val publishedAt: Long?)
-
 class ResidentViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as SecuriResidentApp
@@ -199,11 +196,13 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
                     )
                 )
                 _operationMessage.value = "Résident ${profile.name} ajouté"
+                app.cloudSync.syncSoon()
                 residentDao.getResidentById(id)?.let { repo.syncResidentPosition(it) }
             } else {
                 residentDao.updateProfile(profile)
                 if (!profile.isTrackingActive) alarms.stopAlarm(profile.id)
                 _operationMessage.value = "Fiche de ${profile.name} mise à jour"
+                app.cloudSync.syncSoon()
                 residentDao.getResidentById(profile.id)?.let { repo.syncResidentPosition(it) }
             }
             if (previousPhoto != null && previousPhoto != profile.photoUri) PhotoStore.delete(previousPhoto)
@@ -225,6 +224,7 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
             PhotoStore.delete(resident.photoUri)
             if (_selectedResidentId.value == resident.id) _selectedResidentId.value = null
             _operationMessage.value = "${resident.name} supprimé(e)"
+            app.cloudSync.syncSoon()
         }
     }
 
@@ -232,6 +232,7 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             zoneDao.insertOrUpdate(zone)
             _operationMessage.value = "Zone de sécurité mise à jour"
+            app.cloudSync.syncSoon()
             refreshAllPositions(showLoading = false)
         }
     }
@@ -267,6 +268,11 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
 
     /** « Je m'en occupe » : acquitte, coupe l'alarme de ce résident, arrête les rappels. */
     fun handleAlert(residentId: Long) {
+        if (app.cloudSync.handleForeign(residentId, staffName)) {
+            alarms.stopAlarm(residentId)
+            _operationMessage.value = "Prise en charge signalée aux autres appareils ($staffName)"
+            return
+        }
         viewModelScope.launch {
             val staff = staffName
             val r = repo.markHandling(residentId, staff)
@@ -277,6 +283,11 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
 
     /** « Retrouvé » : lève l'alerte sans modifier la position réelle. */
     fun markFound(residentId: Long) {
+        if (app.cloudSync.resolveForeign(residentId, staffName)) {
+            alarms.stopAlarm(residentId)
+            _operationMessage.value = "Résident signalé retrouvé aux autres appareils"
+            return
+        }
         viewModelScope.launch {
             val r = repo.markFound(residentId, staffName)
             alarms.stopAlarm(residentId)
@@ -378,6 +389,7 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val id = repo.saveAccount(label, username, password, existingId)
             _operationMessage.value = "Compte Weenect enregistré (mot de passe chiffré)"
+            app.cloudSync.syncSoon()
             onSaved(id)
             refreshAllPositions(showLoading = false)
         }
@@ -387,6 +399,7 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repo.deleteAccount(account)
             _operationMessage.value = "Compte ${account.label} supprimé : les résidents associés ne sont plus suivis"
+            app.cloudSync.syncSoon()
         }
     }
 
@@ -530,6 +543,7 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
                     else -> ""
                 }
                 _operationMessage.value = "Configuration « ${backupData.facilityZone.name} » importée (${backupData.residents.size} résidents)$pwdNote"
+                app.cloudSync.syncSoon()
                 refreshAllPositions(showLoading = false)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -575,23 +589,11 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
 
     fun setCloudDeviceName(name: String) = cloudSync.setDeviceName(name)
 
-    /** Publie la configuration de cet appareil ; les mots de passe Weenect sont chiffrés par [passphrase]. */
-    suspend fun publishSharedConfig(passphrase: String, publishedBy: String): Result<Unit> {
-        val json = withContext(Dispatchers.Default) {
-            val accs = accountDao.getAllOnce().map { it to cipher.decrypt(it.encryptedPassword) }
-            ConfigBackupManager.createBackupJson(facilityZone.value, residentDao.getAllResidentsOnce(), publishedBy, accs, passphrase)
+    /** Phrase secrète de l'établissement : permet de partager les mots de passe Weenect entre appareils. */
+    suspend fun setCloudPassphrase(passphrase: String): Result<Unit> =
+        cloudSync.setPassphrase(passphrase).onSuccess {
+            _operationMessage.value = "Phrase secrète enregistrée : les comptes Weenect sont partagés"
         }
-        return cloudSync.publishConfig(json, publishedBy).map { }.onSuccess {
-            _operationMessage.value = "Configuration publiée pour les autres appareils"
-        }
-    }
-
-    suspend fun fetchSharedConfig(): Result<SharedConfigPreview?> = cloudSync.fetchConfig().mapCatching { cfg ->
-        cfg?.let {
-            val data = ConfigBackupManager.parseBackupJson(it.payload) ?: throw IllegalStateException("Configuration partagée illisible")
-            SharedConfigPreview(data, it.publishedBy, it.publishedAt)
-        }
-    }
 
     fun restartMonitoringService(context: Context) {
         ResidentMonitoringService.start(context)

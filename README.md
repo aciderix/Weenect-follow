@@ -17,7 +17,7 @@ pour les établissements médico-sociaux (MAS, EHPAD, FAM).
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-facultatif-3FCF8E?logo=supabase&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-110%2B-success)
+![Tests](https://img.shields.io/badge/tests-120%2B-success)
 ![Langue](https://img.shields.io/badge/langue-fran%C3%A7ais-blue)
 
 [**Télécharger**](https://github.com/aciderix/Weenect-follow/releases/latest) ·
@@ -58,7 +58,7 @@ L'app est conçue pour la nuit et les cas dégradés. En cas de doute (réseau c
 | 🚶 **Sorties accompagnées** | Suspension de la surveillance d'un ou plusieurs résidents pour une durée donnée, reprise automatique |
 | 📒 **Journal** | Sorties, retours, prises en charge, avertissements, exercices ; acquittement ; export PDF / CSV ; prise de poste tracée |
 | 🖥️ **Application Windows** | Poste fixe qui sonne, démarrage automatique, fenêtre au premier plan pendant une alarme, icône près de l'horloge, installateur MSI |
-| 🔗 **Partage entre appareils** | Avec Supabase : une sortie sonne sur tous les appareils, et « Je m'en occupe » coupe l'alarme partout avec le nom du soignant |
+| 🔗 **Partage entre appareils** | Avec Supabase : une sortie sonne sur tous les appareils, « Je m'en occupe » coupe l'alarme partout avec le nom du soignant, et un résident ajouté sur un appareil apparaît automatiquement sur tous les autres |
 | 🔐 **Sécurité** | Mots de passe Weenect chiffrés (Keystore Android / DPAPI Windows), export de configuration chiffré, paramètres protégés par code PIN |
 
 ## Captures
@@ -113,7 +113,7 @@ Téléchargez `AlerteResidents-x.y.z-windows.msi` puis lancez-le. L'installation
 
 ### Installer un autre appareil avec la même configuration
 - **Sans serveur** : sur l'appareil configuré, ouvrez **Paramètres › Sauvegarde › Exporter ou importer la configuration** puis exportez ; les mots de passe sont chiffrés par un code. Sur le nouvel appareil, importez le fichier depuis le même écran.
-- **Avec Supabase** : utilisez **Publier ma config.** puis **Récupérer la config.**
+- **Avec Supabase** : rien à faire. Résidents, comptes Weenect et zone se synchronisent automatiquement dès que l'appareil est connecté au projet. Saisissez la même phrase secrète partout pour partager aussi les mots de passe Weenect.
 
 ## Partage entre appareils (Supabase)
 
@@ -125,6 +125,7 @@ Sans serveur, chaque appareil surveille et sonne **seul**. En reliant tous les a
 | « Je m'en occupe » | l'alarme s'arrête, avec le nom du soignant |
 | « Retrouvé » ou retour confirmé par la balise | l'alerte est levée |
 | Sortie accompagnée | la surveillance est suspendue |
+| Résident ajouté, modifié ou retiré | idem sur tous, automatiquement |
 
 - **La surveillance reste locale** : si Supabase est injoignable, chaque appareil continue de sonner normalement.
 - **Universel** : l'app se connecte à n'importe quel projet. Le schéma est versionné dans [`supabase/migrations/`](supabase/migrations).

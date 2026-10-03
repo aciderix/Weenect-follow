@@ -54,6 +54,9 @@ interface ResidentDao : ResidentStore {
     @Query("UPDATE residents SET accountId = :accountId, weenectUsername = '', weenectPassword = '' WHERE id = :id")
     override suspend fun attachAccount(id: Long, accountId: Long)
 
+    @Query("UPDATE residents SET syncId = :syncId WHERE id = :id")
+    suspend fun setSyncId(id: Long, syncId: String?)
+
     @Query("UPDATE residents SET accountId = NULL WHERE accountId = :accountId")
     override suspend fun detachAccount(accountId: Long)
 }

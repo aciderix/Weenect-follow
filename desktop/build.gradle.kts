@@ -32,7 +32,7 @@ compose.desktop {
     nativeDistributions {
       targetFormats(TargetFormat.Msi, TargetFormat.Exe)
       packageName = "AlerteResidents"
-      packageVersion = "2.0.0"
+      packageVersion = "2.1.0"
       description = "Surveillance des résidents équipés de balises Weenect"
       vendor = "Alerte Résidents"
       modules("java.naming", "java.sql", "jdk.crypto.ec", "java.desktop", "java.instrument", "jdk.unsupported", "java.logging", "java.net.http")

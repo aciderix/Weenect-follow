@@ -6,13 +6,14 @@ Avec un projet Supabase, tous les appareils d'un établissement **coordonnent le
 
 | Ce qui se passe sur un appareil | Effet sur tous les autres |
 |---|---|
-| Une sortie de zone est détectée | Ils sonnent aussi (« Signalé par : PC infirmerie »), même si leur propre connexion à Weenect est en panne |
+| Une sortie de zone est détectée | Ils sonnent aussi (« Signalé par : PC infirmerie »), même si leur propre connexion à Weenect est en panne, et même si le résident n'est pas encore configuré chez eux |
 | « Je m'en occupe » | L'alarme s'arrête partout, avec le nom du soignant |
 | « Retrouvé » ou retour confirmé par la balise | L'alerte est levée partout |
 | Sortie accompagnée démarrée ou terminée | La surveillance du résident est suspendue ou reprise partout |
 | Exercice sur un résident | L'exercice sonne partout (pour tester toute la chaîne) |
 | — | L'écran **État** liste les appareils en ligne et ceux dont la surveillance est dégradée |
-| « Publier ma configuration » | Les autres peuvent récupérer la zone, les résidents et les comptes Weenect sans échanger de fichier |
+| Un résident est ajouté, modifié ou retiré | Il apparaît, change ou disparaît automatiquement sur tous les autres, en quelques secondes |
+| Un compte Weenect ou la zone est modifié | Idem : un seul endroit à mettre à jour |
 
 **La surveillance reste locale et autonome.** Chaque appareil continue d'interroger Weenect et de sonner lui-même. Si Supabase est injoignable, rien ne change pour la sécurité : seule la coordination s'arrête. Les actions faites hors ligne sont envoyées au retour du réseau.
 
@@ -27,7 +28,10 @@ L'app peut se connecter à **n'importe quel projet Supabase** (supabase.com ou a
 | `incidents` | une ligne par sortie de zone : identifiant de balise, nom du résident, heure, position **au moment de la sortie**, qui a pris en charge, comment l'alerte a été levée | coordonner l'alarme et garder la trace de qui a fait quoi |
 | `resident_pauses` | sorties accompagnées en cours (balise, jusqu'à quand, motif, par qui) | ne pas sonner pendant une sortie prévue |
 | `devices` | appareils connectés : nom, type, nombre de balises suivies, état de la surveillance, dernier contact | savoir qui surveille |
-| `shared_config` | la configuration publiée (même format que l'export de l'app). **Les mots de passe Weenect y sont chiffrés sur l'appareil par une phrase secrète que Supabase ne connaît pas.** | installer un nouvel appareil en 1 minute |
+| `residents` | fiches résidents : nom, chambre, unité, couleur, balise, compte Weenect, contact d'urgence, notes, niveau de risque, suivi actif. **Ni photo ni position.** | ajouter un résident une seule fois pour tous les appareils |
+| `weenect_accounts` | comptes Weenect : libellé, identifiant. **Le mot de passe est chiffré sur l'appareil par la phrase secrète de l'établissement, que Supabase ne connaît pas.** | ne pas ressaisir les comptes sur chaque appareil |
+| `facility_settings` | la zone de l'établissement (même format que l'export de l'app) et un contrôle permettant de vérifier la phrase secrète | une seule zone pour tous |
+| `shared_config` | ancienne configuration publiée manuellement (version 2.0), conservée pour compatibilité | — |
 | `staff` | les comptes autorisés | contrôle d'accès |
 | `keepalive` | une seule ligne d'horodatage | éviter la mise en pause du projet gratuit |
 
@@ -36,9 +40,9 @@ Ce qui **n'est pas** stocké :
 - **les photos** ;
 - **les identifiants Weenect en clair**.
 
-Les résidents sont reconnus d'un appareil à l'autre par l'**identifiant de leur balise Weenect**. Il n'y a pas d'identifiant à synchroniser : deux appareils configurés séparément, par exemple par import de fichier, se comprennent tout de suite.
+Les **alertes** reconnaissent un résident d'un appareil à l'autre par l'**identifiant de sa balise Weenect**. Les **fiches** ont en plus un identifiant partagé. Quand un appareil déjà configuré se connecte pour la première fois, ses fiches sont rattachées aux fiches partagées de même balise : pas de doublon. Sans balise, la fiche est rattachée par nom et chambre ; pour les comptes Weenect, par identifiant. Si deux appareils modifient la même fiche, la dernière modification enregistrée l'emporte.
 
-Le schéma complet est versionné dans [`supabase/migrations/`](../supabase/migrations). Le script est **idempotent** : il ne supprime jamais rien et peut être relancé sans risque.
+Le schéma complet est versionné dans [`supabase/migrations/`](../supabase/migrations), un fichier par version, à exécuter dans l'ordre. Les scripts sont **idempotents** : ils ne suppriment jamais rien et peuvent être relancés sans risque.
 
 ---
 
@@ -48,7 +52,10 @@ Le schéma complet est versionné dans [`supabase/migrations/`](../supabase/migr
 Sur [supabase.com](https://supabase.com) : **New project**. Choisissez une région en Europe (par exemple *West EU (Ireland)* ou *Central EU (Frankfurt)*) et notez le mot de passe de la base.
 
 ### 2. Créer les tables
-**SQL Editor › New query** : collez tout le contenu de `supabase/migrations/20261002180000_alerte_residents_init.sql`, puis **Run**.
+**SQL Editor › New query** : collez le contenu de chaque fichier de `supabase/migrations/`, **dans l'ordre**, puis **Run** :
+1. `20261002180000_alerte_residents_init.sql` (alertes, appareils, accès) ;
+2. `20261003120000_sync_configuration.sql` (synchronisation des résidents, comptes et zone, version 2.1).
+
 Avec la CLI, c'est équivalent : `supabase link --project-ref <ref>` puis `supabase db push`.
 
 Pour vérifier : **Advisors › Security Advisor** ne doit afficher aucune alerte.
@@ -77,13 +84,17 @@ Cette clé est faite pour être mise dans une application. Seule, elle ne donne 
 ⚠️ Ne mettez **jamais** la clé `service_role` / `secret` dans l'app.
 
 ### 7. Connecter chaque appareil
-Dans l'app, sur Android comme sur Windows : **Paramètres › Partage entre appareils › Connecter à Supabase**. Renseignez l'adresse, la clé publique, l'e-mail, le mot de passe et un nom d'appareil parlant (« PC cadre de santé »).
+Dans l'app, sur Android comme sur Windows : **Paramètres › Partage entre appareils › Connecter à Supabase**. Renseignez l'adresse, la clé publique, l'e-mail, le mot de passe, un nom d'appareil parlant (« PC cadre de santé ») et la **phrase secrète de l'établissement** (voir l'étape 8).
 Le mot de passe n'est pas conservé. Seul un jeton de session est gardé, chiffré par le Keystore Android ou par la protection de session Windows.
 
-### 8. Partager la configuration (facultatif)
-Sur l'appareil déjà configuré : **Publier ma config.**, avec une phrase secrète d'au moins 6 caractères.
-Sur les autres : **Récupérer la config.**, puis saisissez la phrase et choisissez **Fusionner** ou **Remplacer**.
-Transmettez la phrase de vive voix, jamais par le même canal que les identifiants.
+Commencez par l'appareil déjà configuré, celui qui a la zone, les comptes et les résidents : il les partage automatiquement. Les appareils suivants les reçoivent en quelques secondes. S'ils avaient déjà des résidents, ceux-ci sont rattachés aux fiches partagées de même balise, sans doublon.
+
+### 8. Phrase secrète de l'établissement
+Elle chiffre les **mots de passe Weenect** sur l'appareil avant leur partage : Supabase ne peut pas les lire.
+- Le premier appareil la choisit (au moins 6 caractères) ; tous les autres doivent saisir **la même**. L'app vérifie qu'elle est correcte.
+- Sans phrase secrète, résidents, comptes et zone sont quand même partagés, mais les comptes arrivent sans mot de passe : il faudrait les ressaisir sur chaque appareil. L'écran le signale.
+- Transmettez-la de vive voix, jamais par le même canal que les identifiants.
+- Phrase oubliée : un administrateur peut la réinitialiser dans le SQL Editor avec `update public.facility_settings set passphrase_check = null;`. Saisissez ensuite une nouvelle phrase sur chaque appareil.
 
 ### 9. Empêcher la mise en pause (projets gratuits)
 Supabase met en pause un projet gratuit **après 7 jours sans activité**. L'action GitHub [`supabase-keepalive.yml`](../.github/workflows/supabase-keepalive.yml) l'appelle 4 fois par jour.
@@ -108,8 +119,8 @@ Si le projet a quand même été mis en pause : tableau de bord Supabase › **R
 
 - **Row Level Security sur toutes les tables.** L'accès est réservé aux comptes de `staff`. La fonction de contrôle (`private.is_staff`) est dans un schéma non exposé par l'API.
 - **Clé publique seule** : aucun accès aux données, seulement `keepalive()`, qui n'écrit qu'un horodatage.
-- **Écritures** : elles passent uniquement par des fonctions SQL documentées (`report_exit`, `handle_incident`, `resolve_incident`, `set_pause`, `sync_state`, `publish_config`, `get_shared_config`). Ces fonctions s'exécutent avec les droits de l'utilisateur connecté, donc la RLS s'applique.
-- **Mots de passe Weenect** : ils ne sont jamais envoyés en clair. Dans la configuration partagée, ils sont chiffrés sur l'appareil (PBKDF2 + AES-GCM) par la phrase secrète.
+- **Écritures** : elles passent uniquement par des fonctions SQL documentées (voir la référence technique). Ces fonctions s'exécutent avec les droits de l'utilisateur connecté, donc la RLS s'applique.
+- **Mots de passe Weenect** : ils ne sont jamais envoyés en clair. Ils sont chiffrés sur l'appareil (PBKDF2 + AES-GCM) par la phrase secrète, que Supabase ne reçoit jamais : la table `facility_settings` ne contient qu'un contrôle chiffré permettant de vérifier une phrase saisie.
 - **Sur les appareils** : jeton de session chiffré par le Keystore Android ou DPAPI sous Windows.
 - **Bonnes pratiques Supabase** : activez la double authentification sur le compte propriétaire du projet et gardez un deuxième propriétaire dans l'organisation.
 
@@ -117,7 +128,7 @@ Si le projet a quand même été mis en pause : tableau de bord Supabase › **R
 
 Les noms des résidents et l'historique de leurs sorties sont des données personnelles, voire **de santé** dans un contexte EHPAD/MAS. **Avant la mise en service, validez ce point avec votre DPO** :
 - **Hébergement de données de santé (HDS)** : en France, l'hébergement de données de santé pour le compte d'un établissement relève de la certification HDS. Supabase *cloud* n'est pas, à notre connaissance, certifié HDS. Deux options :
-  - utiliser Supabase uniquement pour la coordination, en évitant les informations médicales dans les notes des fiches (elles sont incluses dans la configuration publiée) ;
+  - utiliser Supabase en évitant les informations médicales dans les **notes** et le **contact d'urgence** des fiches : ces champs sont synchronisés en clair dans la table `residents` ;
   - ou **auto-héberger Supabase** chez un hébergeur certifié HDS. L'app accepte n'importe quelle adresse de projet.
 - **Minimisation** : seule la position au moment de la sortie est conservée. Il n'y a ni trajet ni photo.
 - **Durée de conservation** : la fonction `purge_history(jours)` supprime les incidents clos, les sorties accompagnées terminées et les appareils inactifs plus anciens que la durée choisie. Une alerte en cours n'est jamais supprimée.
@@ -134,12 +145,15 @@ Les noms des résidents et l'historique de leurs sorties sont des données perso
 | Fonction | Rôle |
 |---|---|
 | `check_access()` | vérifie à la connexion que le compte est dans `staff` |
-| `sync_state(device…, since)` | toutes les 6 s : signale l'appareil, renvoie les incidents ouverts et récents, les sorties accompagnées, les appareils et la version de la configuration |
+| `sync_state(device…, since)` | toutes les 6 s : signale l'appareil, renvoie les incidents ouverts et récents, les sorties accompagnées et les appareils |
+| `sync_config(since)` | toutes les 6 s : fiches résidents, comptes et zone modifiés depuis le dernier échange (tout au démarrage) |
+| `save_resident(fiche, by)` / `save_account(compte, by)` / `save_zone(zone, by)` | envoi d'une fiche créée, modifiée ou retirée (`removed`) ; sans `password_enc`, le mot de passe partagé est conservé |
+| `init_passphrase_check(contrôle)` | enregistre le contrôle de la phrase secrète au premier appareil, puis le renvoie pour vérification |
 | `report_exit(tracker, …)` | ouvre l'incident, ou renvoie celui déjà ouvert par un autre appareil (un seul incident ouvert par balise, garanti par un index unique) |
 | `handle_incident(tracker, drill, staff)` | « Je m'en occupe » |
 | `resolve_incident(tracker, drill, staff, resolution)` | `found` (retrouvé), `returned` (balise), `outing` (sortie accompagnée) |
 | `set_pause(tracker, name, until, reason, staff)` | début ou fin d'une sortie accompagnée (clôt l'incident ouvert) |
-| `publish_config(payload, by)` / `get_shared_config()` | configuration partagée |
+| `publish_config(payload, by)` / `get_shared_config()` | ancienne configuration publiée manuellement (2.0), conservée pour compatibilité |
 | `keepalive()` | ouverte à la clé publique ; met à jour un horodatage |
 | `add_staff(email, nom)`, `purge_history(jours)` | administration, depuis le SQL Editor uniquement |
 
