@@ -2,6 +2,19 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Les versions suivent [SemVer](https://semver.org/lang/fr/).
 
+## [2.1.3] — 2026-10-03
+
+### Surveillance qui ne s'arrête plus en silence
+Constat : Android (ou l'économiseur de batterie du fabricant) peut arrêter l'application. La surveillance cessait alors sans prévenir : la notification permanente disparaissait et aucune alerte n'était donnée, même à la fin d'une sortie accompagnée avec la balise toujours hors zone.
+
+- **Chien de garde** : une alarme système relance la surveillance toutes les 15 minutes si elle a été arrêtée, même téléphone en veille. Elle relance aussi juste après un balayage de l'appli dans les applis récentes, et après un plantage. Au redémarrage, la position est relue immédiatement : l'alarme sonne si un résident est dehors.
+- **Interruption tracée** : à la relance, « Surveillance interrompue de 10:50 à 19:52 (9 h 2 min) » est inscrit au journal (à traiter) et notifié, avec la cause (plantage ou arrêt par le téléphone). L'appli Windows le fait aussi (poste éteint, en veille ou appli fermée).
+- **Les autres appareils sont prévenus** : un appareil qui surveillait des résidents et ne donne plus signe de vie depuis 10 minutes est signalé une fois sur les autres (« 📵 Karim ne surveille plus »), puis à son retour.
+- **Écran État** :
+  - nouvelle vérification « Relance automatique » (autorisation Alarmes et rappels) ;
+  - pour les marques connues pour arrêter les applis (Xiaomi, Samsung, Huawei, Oppo, OnePlus…), un lien vers le guide de réglage de la marque.
+- Une erreur imprévue dans une tâche de fond ne fait plus planter l'application.
+
 ## [2.1.2] — 2026-10-03
 
 ### Correction
@@ -68,6 +81,7 @@ Première version publiée : refonte complète après audit, application Windows
 - Sirène intégrée (« Alarme détecteur de fumée 3 », La Sonothèque).
 - Plus de 110 tests automatisés : moteur, migration, chiffrement, partage, rendu des écrans.
 
+[2.1.3]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.3
 [2.1.2]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.2
 [2.1.1]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.1
 [2.1.0]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.0

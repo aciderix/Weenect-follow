@@ -103,7 +103,8 @@ Les fichiers à installer sont dans les [**Releases**](https://github.com/acider
 
 ### 📱 Android
 1. Téléchargez `AlerteResidents-x.y.z-android.apk` sur le téléphone et ouvrez-le. Autorisez l'installation depuis cette source si Android le demande.
-2. Au premier lancement, acceptez les **notifications** et, dans **Paramètres › État de la surveillance**, corrigez chaque point en rouge : alerte plein écran, batterie sans restriction…
+2. Au premier lancement, acceptez les **notifications** et, dans **Paramètres › État de la surveillance**, corrigez chaque point en rouge : alerte plein écran, batterie sans restriction, relance automatique…
+   Sur Xiaomi, Samsung, Huawei, Oppo, OnePlus…, suivez aussi le **guide de la marque** proposé sur cet écran (démarrage automatique, appli verrouillée dans les applis récentes) : ces téléphones peuvent arrêter la surveillance pour économiser la batterie. Si cela arrive quand même, l'appli se relance seule et l'interruption est inscrite au journal.
 3. Ajoutez le **compte Weenect** de l'établissement, tracez la **zone**, puis ajoutez les **résidents** et associez à chacun sa balise.
 4. Faites un **test d'alarme** (Paramètres › Son de l'alarme › Tester maintenant).
 

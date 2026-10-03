@@ -6,6 +6,7 @@ import fr.alerteresidents.data.remote.WeenectRepository
 import fr.alerteresidents.desktop.data.DesktopStore
 import fr.alerteresidents.desktop.platform.Platform
 import fr.alerteresidents.domain.HealthSnapshot
+import fr.alerteresidents.domain.MonitoringGap
 import fr.alerteresidents.domain.MonitoringHealth
 import fr.alerteresidents.util.DateParsing
 import fr.alerteresidents.util.DesktopNotifier
@@ -29,7 +30,10 @@ import java.util.logging.Logger
 class DesktopMonitor(
     private val store: DesktopStore,
     private val repo: WeenectRepository,
-    private val notifier: () -> DesktopNotifier
+    private val notifier: () -> DesktopNotifier,
+    /** Dernier cycle enregistré (persistant) et son enregistrement : repère les interruptions. */
+    private val lastBeat: () -> Long = { 0L },
+    private val saveBeat: (Long) -> Unit = {}
 ) {
     private val log = Logger.getLogger("DesktopMonitor")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -37,12 +41,18 @@ class DesktopMonitor(
     private val cycleMutex = Mutex()
     private var degradedNotified = false
     private var lastPurgeAt = 0L
+    private var beat = 0L
+    private var beatSavedAt = 0L
+    private var interval = 15
 
     fun start() {
         if (job?.isActive == true) return
         MonitoringHealth.update { it.copy(serviceRunning = true) }
         job = scope.launch {
+            beat = lastBeat()
             while (isActive) {
+                // Poste mis en veille ou appli fermée depuis le dernier cycle : tracé dans le journal.
+                runCatching { reportInterruption(System.currentTimeMillis()) }
                 try {
                     runCycle()
                 } catch (e: CancellationException) {
@@ -50,11 +60,25 @@ class DesktopMonitor(
                 } catch (e: Exception) {
                     log.warning("Erreur cycle : ${e.message}")
                 }
-                val interval = store.zone.value.refreshIntervalFor(DateParsing.hourOf(System.currentTimeMillis()))
+                interval = store.zone.value.refreshIntervalFor(DateParsing.hourOf(System.currentTimeMillis()))
                 MonitoringHealth.update { it.copy(nextIntervalSeconds = interval) }
                 delay(interval * 1000L)
             }
         }
+    }
+
+    private suspend fun reportInterruption(now: Long) {
+        val gap = MonitoringGap.detect(beat, now, interval)
+        beat = now
+        // Enregistré au plus une fois par minute (fichier de réglages réécrit à chaque fois).
+        if (now - beatSavedAt >= 60_000L || gap != null) {
+            beatSavedAt = now
+            saveBeat(now)
+        }
+        if (gap == null) return
+        val msg = gap.message(MonitoringGap.CAUSE_DESKTOP)
+        store.insertAlert(AlertEvent(residentId = -1, residentName = "Surveillance", alertType = AlertType.MONITORING_DEGRADED, details = msg))
+        notifier().warning("⚠️ Surveillance interrompue", msg)
     }
 
     fun refreshNow() {

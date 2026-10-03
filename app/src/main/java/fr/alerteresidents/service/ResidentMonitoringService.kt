@@ -19,12 +19,14 @@ import fr.alerteresidents.SecuriResidentApp
 import fr.alerteresidents.data.model.AlertEvent
 import fr.alerteresidents.data.model.AlertType
 import fr.alerteresidents.domain.HealthSnapshot
+import fr.alerteresidents.domain.MonitoringGap
 import fr.alerteresidents.domain.MonitoringHealth
 import fr.alerteresidents.domain.MonitoringSummary
 import fr.alerteresidents.domain.ResidentStatus
 import fr.alerteresidents.domain.ResidentStatusResolver
 import fr.alerteresidents.util.DateParsing
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,13 +47,20 @@ import kotlinx.coroutines.sync.withPermit
  */
 class ResidentMonitoringService : Service() {
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Une erreur imprévue dans une tâche ne doit jamais faire planter l'app (donc la surveillance).
+    private val serviceScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e -> Log.e(TAG, "Erreur imprévue: ${e.message}", e) }
+    )
     private var monitoringJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private val cycleMutex = Mutex()
     private var degradedNotified = false
     private var lastPurgeAt = 0L
     @Volatile private var facilityName = "Alerte Résidents"
+    /** Dernier texte de la notification permanente (réutilisé quand le service est relancé). */
+    @Volatile private var statusText = "Démarrage de la surveillance…"
+    @Volatile private var statusAlert = false
+    private var stopRequested = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -66,20 +75,37 @@ class ResidentMonitoringService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                stopRequested = true
                 stopSelf()
                 return START_NOT_STICKY
             }
             ACTION_REFRESH_NOW -> {
                 ensureForeground()
                 if (monitoringJob?.isActive != true) startMonitoringLoop()
-                serviceScope.launch { runCycle() }
+                serviceScope.launch {
+                    try {
+                        runCycle()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Erreur actualisation: ${e.message}")
+                    }
+                }
             }
             else -> {
                 ensureForeground()
                 if (monitoringJob?.isActive != true) startMonitoringLoop()
             }
         }
+        // Filet de sécurité si Android arrête l'app : relance par alarme système.
+        MonitoringWatchdog.schedule(this)
         return START_STICKY
+    }
+
+    /** Appli balayée des applis récentes : certains fabricants tuent alors le service → relance rapide. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        MonitoringWatchdog.schedule(this, 5_000L)
+        super.onTaskRemoved(rootIntent)
     }
 
     /**
@@ -88,7 +114,7 @@ class ResidentMonitoringService : Service() {
      * sur Android 14+).
      */
     private fun ensureForeground() {
-        val notification = buildOngoingNotification("Démarrage de la surveillance…", alert = false)
+        val notification = buildOngoingNotification(statusText, statusAlert)
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -106,22 +132,47 @@ class ResidentMonitoringService : Service() {
         monitoringJob?.cancel()
         monitoringJob = serviceScope.launch {
             val app = application as? SecuriResidentApp ?: return@launch
+            runCatching { reportInterruption(app) }.onFailure { Log.e(TAG, "Trace interruption: ${it.message}") }
             while (isActive) {
                 // Wakelock renouvelé à chaque cycle (borné) plutôt que tenu indéfiniment
                 runCatching { wakeLock?.acquire(10 * 60_000L) }
+                var interval = 15
                 try {
                     runCycle()
+                    val zone = app.database.facilityZoneDao().getFacilityZoneOnce()
+                    interval = zone?.refreshIntervalFor(DateParsing.hourOf(System.currentTimeMillis())) ?: 15
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     Log.e(TAG, "Erreur cycle surveillance: ${e.message}")
                 }
-                val zone = app.database.facilityZoneDao().getFacilityZoneOnce()
-                val interval = zone?.refreshIntervalFor(DateParsing.hourOf(System.currentTimeMillis())) ?: 15
+                // Battement persistant : à la relance, un trou trop long est signalé.
+                app.preferences.lastMonitoringInterval = interval
+                app.preferences.lastMonitoringBeat = System.currentTimeMillis()
                 MonitoringHealth.update { it.copy(nextIntervalSeconds = interval) }
                 delay(interval * 1000L)
             }
         }
+    }
+
+    /**
+     * Au (re)démarrage de la boucle : si le dernier cycle connu est trop ancien (app tuée,
+     * plantage, téléphone éteint), l'interruption est inscrite au journal (à traiter) et notifiée.
+     */
+    private suspend fun reportInterruption(app: SecuriResidentApp) {
+        val prefs = app.preferences
+        val crash = prefs.pendingCrash
+        val now = System.currentTimeMillis()
+        val gap = MonitoringGap.detect(prefs.lastMonitoringBeat, now, prefs.lastMonitoringInterval, crash)
+        if (crash != null) prefs.pendingCrash = null
+        val message = gap?.message()
+            ?: crash?.let { "L'application a planté ($it) et la surveillance a redémarré automatiquement." }
+            ?: return
+        Log.w(TAG, message)
+        app.database.alertEventDao().insertAlert(
+            AlertEvent(residentId = -1, residentName = "Surveillance", alertType = AlertType.MONITORING_DEGRADED, details = message)
+        )
+        if (gap != null) app.soundAlertManager.notificationHelper.showWarning(null, AlertType.MONITORING_DEGRADED, message)
     }
 
     private suspend fun runCycle() {
@@ -245,6 +296,8 @@ class ResidentMonitoringService : Service() {
     }
 
     private fun updateNotification(statusText: String, alert: Boolean) {
+        this.statusText = statusText
+        statusAlert = alert
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, buildOngoingNotification(statusText, alert))
     }
@@ -264,6 +317,8 @@ class ResidentMonitoringService : Service() {
     }
 
     override fun onDestroy() {
+        // Arrêt par le système (mémoire…) : START_STICKY le relance en principe, l'alarme en dernier recours.
+        if (!stopRequested) MonitoringWatchdog.schedule(this, 60_000L)
         monitoringJob?.cancel()
         serviceScope.cancel()
         runCatching { if (wakeLock?.isHeld == true) wakeLock?.release() }
