@@ -16,3 +16,7 @@ build/
 local.properties
 .env
 debug.keystore
+# Clés de signature et artefacts de release (jamais dans le dépôt)
+*.jks
+*.keystore
+/dist

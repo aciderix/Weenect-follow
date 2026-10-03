@@ -1,0 +1,161 @@
+name: Release
+
+# Publie une version, au choix :
+#   - en poussant un tag :            git tag v2.0.0 && git push origin v2.0.0
+#   - depuis GitHub : Actions › Release › Run workflow, version « 2.0.0 » (le tag v2.0.0 est
+#     alors créé sur le commit choisi)
+# Construit l'APK Android et l'installateur Windows, puis crée la release GitHub avec les
+# notes de la section correspondante de CHANGELOG.md.
+#
+# Signature Android (recommandée, sinon l'APK est signé avec une clé de debug jetable et
+# ne pourra pas être mis à jour par-dessus une version précédente) — secrets du dépôt :
+#   ANDROID_KEYSTORE_BASE64  keystore encodé en base64 (alias « upload »)
+#   ANDROID_STORE_PASSWORD   mot de passe du keystore
+#   ANDROID_KEY_PASSWORD     mot de passe de la clé
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à publier, sans le v (ex. 2.0.0) — doit avoir sa section dans CHANGELOG.md"
+        required: true
+
+env:
+  # Version sans le « v » : depuis le tag poussé, ou depuis la saisie manuelle.
+  VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: APK Android
+    runs-on: ubuntu-latest
+    outputs:
+      signed: ${{ steps.signing.outputs.signed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Signing key
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+            echo "STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Pas de clé de signature : APK de debug (non mis à jour par-dessus une autre version)."
+            keytool -genkey -keystore debug.keystore -keyalg RSA -keysize 2048 -validity 10000 \
+              -alias androiddebugkey -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tests
+        run: |
+          chmod +x gradlew
+          ./gradlew :core:test testDebugUnitTest --stacktrace
+
+      - name: Build APK
+        run: |
+          VERSION="${VERSION#v}"
+          mkdir -p dist
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            ./gradlew assembleRelease --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk "dist/AlerteResidents-$VERSION-android.apk"
+          else
+            ./gradlew assembleDebug --stacktrace
+            cp app/build/outputs/apk/debug/app-debug.apk "dist/AlerteResidents-$VERSION-android.apk"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*.apk
+
+  windows:
+    name: Installateur Windows
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+      - name: Build MSI
+        shell: bash
+        run: |
+          ./gradlew :desktop:packageMsi --stacktrace
+          VERSION="${VERSION#v}"
+          mkdir -p dist
+          cp desktop/build/compose/binaries/main/msi/*.msi "dist/AlerteResidents-$VERSION-windows.msi"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.msi
+
+  publish:
+    name: Publier la release
+    needs: [ android, windows ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Release notes
+        run: |
+          VERSION="${VERSION#v}"
+          # Section « ## [VERSION] » de CHANGELOG.md, jusqu'à la section suivante
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on && /^\[[^]]+\]: / { next }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::Aucune section [$VERSION] dans CHANGELOG.md"
+            exit 1
+          fi
+          {
+            echo
+            echo "## Téléchargements"
+            echo
+            echo "| Fichier | Pour |"
+            echo "|---|---|"
+            echo "| \`AlerteResidents-$VERSION-android.apk\` | téléphones Android 7.0 et plus |"
+            echo "| \`AlerteResidents-$VERSION-windows.msi\` | PC Windows 10 / 11 (installation sans droits administrateur) |"
+            echo
+            echo "Installation et configuration : voir le [README](https://github.com/${GITHUB_REPOSITORY}#readme)."
+            if [ "${{ needs.android.outputs.signed }}" != "true" ]; then
+              echo
+              echo "> ⚠️ APK signé avec une clé de test : désinstallez la version précédente avant d'installer celle-ci (les données locales seront perdues ; exportez la configuration avant)."
+            fi
+          } >> notes.md
+          cat notes.md
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${VERSION#v}"
+          # Tag poussé : la release s'y rattache. Lancement manuel : le tag est créé sur ce commit.
+          gh release create "v$VERSION" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "Alerte Résidents $VERSION" \
+            --notes-file notes.md

@@ -130,7 +130,7 @@ fun CloudSyncSection(viewModel: ResidentViewModel) {
             Text(
                 "Reliez les téléphones et PC de l'établissement à un projet Supabase : une sortie détectée par un appareil " +
                     "sonne sur tous, et « Je m'en occupe » coupe l'alarme partout avec le nom du soignant. " +
-                    "Mise en place : voir SUPABASE.md dans le dépôt.",
+                    "Mise en place : voir docs/SUPABASE.md dans le dépôt GitHub.",
                 fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Button(onClick = { showConnect = true }, modifier = Modifier.fillMaxWidth().testTag("cloud_connect_button")) {
