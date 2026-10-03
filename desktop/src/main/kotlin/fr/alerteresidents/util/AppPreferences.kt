@@ -60,6 +60,11 @@ class AppPreferences(dir: File) {
         get() = props.getProperty("last_shift_check")?.toLongOrNull() ?: 0L
         set(value) = set("last_shift_check", value.toString())
 
+    /** Dernier cycle de surveillance (repère une interruption : poste éteint, en veille, appli fermée). */
+    var lastMonitoringBeat: Long
+        get() = props.getProperty("monitoring_last_beat")?.toLongOrNull() ?: 0L
+        set(value) = set("monitoring_last_beat", value.toString())
+
     /** Premier lancement : active le démarrage automatique une seule fois. */
     var autostartInitialized: Boolean
         get() = bool("autostart_initialized", false)

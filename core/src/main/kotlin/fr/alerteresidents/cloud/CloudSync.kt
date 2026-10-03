@@ -283,13 +283,16 @@ class CloudSync(
             apply(dto)
             // Fenêtre de recouvrement : les changements validés pendant la lecture ne sont jamais perdus.
             cursor = DateParsing.parseIso(dto.now)?.let { DateParsing.formatIso(it - 30_000L) }
+            val devices = dto.devices.map {
+                CloudDevice(it.id, it.name, it.platform, it.monitoringOk, it.residentsCount, DateParsing.parseIso(it.lastSeenAt), it.id == deviceId)
+            }
+            // Heure du serveur : l'horloge du téléphone peut être décalée.
+            checkSilentDevices(devices, DateParsing.parseIso(dto.now) ?: clock())
             _state.value = baseState().copy(
                 connected = true,
                 lastSyncAt = clock(),
                 error = null,
-                devices = dto.devices.map {
-                    CloudDevice(it.id, it.name, it.platform, it.monitoringOk, it.residentsCount, DateParsing.parseIso(it.lastSeenAt), it.id == deviceId)
-                },
+                devices = devices,
                 sharedResidents = configSync.sharedResidents,
                 passphraseNeeded = configSync.passphraseNeeded
             )
@@ -311,6 +314,48 @@ class CloudSync(
                 pendingChanges = pendingCount()
             )
             false
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Appareils qui cessent de surveiller
+    // ------------------------------------------------------------------------------------------
+
+    /** Appareils vus en train de surveiller des résidents depuis le lancement, et ceux signalés muets. */
+    private val seenMonitoring = HashSet<String>()
+    private val silentReported = HashSet<String>()
+
+    /**
+     * Un autre appareil qui surveillait des résidents ne donne plus signe de vie depuis
+     * [SILENT_MS] (appli arrêtée par Android, téléphone éteint, plus de réseau) : les autres
+     * appareils sont prévenus une fois, puis une fois encore à son retour.
+     */
+    internal fun checkSilentDevices(devices: List<CloudDevice>, now: Long) {
+        val online = devices.filter { (it.lastSeenAt ?: 0) > now - CloudState.ONLINE_MS }
+        for (d in devices) {
+            if (d.isThisDevice) continue
+            val seen = d.lastSeenAt ?: continue
+            if (d in online) {
+                if (d.residentsCount > 0) seenMonitoring += d.id
+                if (silentReported.remove(d.id)) {
+                    alarms.info("✅ ${d.name} surveille de nouveau", "L'appareil « ${d.name} » est de nouveau en ligne.")
+                }
+                continue
+            }
+            if (d.id !in seenMonitoring || d.id in silentReported || now - seen < SILENT_MS) continue
+            // Réinstallation : la nouvelle installation du même nom a pris le relais.
+            if (online.any { it.name.equals(d.name, ignoreCase = true) && it.platform == d.platform }) {
+                seenMonitoring -= d.id
+                continue
+            }
+            silentReported += d.id
+            val at = java.text.SimpleDateFormat("HH:mm", java.util.Locale.FRANCE).format(java.util.Date(seen))
+            alarms.info(
+                "📵 ${d.name} ne surveille plus",
+                "Aucun signal de « ${d.name} » depuis $at (${fr.alerteresidents.domain.MonitoringGap.duration(now - seen)}). " +
+                    "S'il n'a pas été éteint volontairement, vérifiez-le : l'appli a pu être arrêtée par le téléphone " +
+                    "ou il n'a plus de réseau. Les autres appareils continuent de surveiller."
+            )
         }
     }
 
@@ -629,6 +674,8 @@ class CloudSync(
         const val K_KEY = "cloud.key"
         const val K_EMAIL = "cloud.email"
         const val K_REFRESH = "cloud.refresh"
+        /** Silence d'un appareil (sans signal) au-delà duquel les autres sont prévenus. */
+        const val SILENT_MS = 10 * 60_000L
         const val K_DEVICE_ID = "cloud.device_id"
         const val K_DEVICE_NAME = "cloud.device_name"
         const val K_DISPLAY_NAME = "cloud.display_name"

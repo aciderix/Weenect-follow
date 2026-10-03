@@ -73,7 +73,10 @@ class DesktopApp(
         }
     )
 
-    val monitor = DesktopMonitor(store, repository) { notifier }
+    val monitor = DesktopMonitor(
+        store, repository, notifier = { notifier },
+        lastBeat = { preferences.lastMonitoringBeat }, saveBeat = { preferences.lastMonitoringBeat = it }
+    )
 
     /** Partage de l'état d'alerte avec les autres appareils (projet Supabase de l'établissement). */
     val cloudSync = CloudSync(
@@ -104,7 +107,7 @@ class DesktopApp(
     }
 
     companion object {
-        const val APP_VERSION = "2.1.2"
+        const val APP_VERSION = "2.1.3"
 
         fun defaultDeviceName(): String =
             (System.getenv("COMPUTERNAME") ?: runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull())

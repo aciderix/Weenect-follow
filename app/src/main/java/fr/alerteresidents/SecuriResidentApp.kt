@@ -3,6 +3,7 @@ package fr.alerteresidents
 import android.app.Application
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import fr.alerteresidents.cloud.CloudAlarmPort
 import fr.alerteresidents.cloud.CloudSync
 import fr.alerteresidents.cloud.KeyValueStore
@@ -14,8 +15,10 @@ import fr.alerteresidents.data.remote.MonitoringListener
 import fr.alerteresidents.data.remote.MonitoringSettings
 import fr.alerteresidents.data.remote.WeenectRepository
 import fr.alerteresidents.security.KeystoreCredentialCipher
+import fr.alerteresidents.service.MonitoringWatchdog
 import fr.alerteresidents.util.AppPreferences
 import fr.alerteresidents.util.SoundAlertManager
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,7 +42,10 @@ class SecuriResidentApp : Application() {
     lateinit var cloudSync: CloudSync
         private set
 
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Une erreur imprévue dans une tâche de fond ne doit jamais faire planter l'app (donc la surveillance).
+    val appScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e -> Log.e("AlerteResidents", "Erreur imprévue: ${e.message}", e) }
+    )
 
     override fun onCreate() {
         super.onCreate()
@@ -47,6 +53,7 @@ class SecuriResidentApp : Application() {
         fr.alerteresidents.util.HttpClients.userAgent = "AlerteResidents/2.0 (Android)"
         database = AppDatabase.getInstance(this)
         preferences = AppPreferences(this)
+        recordCrashes()
         soundAlertManager = SoundAlertManager(this, soundChoice = { preferences.alarmSound.value })
         val notifications = soundAlertManager.notificationHelper
 
@@ -106,12 +113,30 @@ class SecuriResidentApp : Application() {
         weenectRepository.sharedHooks = cloudSync
         cloudSync.start(appScope)
 
+        // Relance automatique de la surveillance si Android arrête l'app (chien de garde).
+        MonitoringWatchdog.schedule(this)
+
         // Anciennes versions : identifiants Weenect en clair dans les fiches → comptes chiffrés.
         if (!preferences.legacyCredentialsMigrated) {
             appScope.launch {
                 runCatching { weenectRepository.migrateLegacyCredentials() }
                     .onSuccess { preferences.legacyCredentialsMigrated = true }
             }
+        }
+    }
+
+    /**
+     * Plantage : noté (de façon synchrone) avant l'arrêt du processus, puis inscrit au journal à
+     * la relance de la surveillance par le chien de garde.
+     */
+    private fun recordCrashes() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
+            runCatching {
+                preferences.pendingCrash = "${e.javaClass.simpleName} : ${e.message ?: "sans message"}".take(300)
+                MonitoringWatchdog.schedule(this, 10_000L)
+            }
+            previous?.uncaughtException(thread, e)
         }
     }
 }

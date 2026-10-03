@@ -526,4 +526,42 @@ class CloudSyncTest {
         ))
         assertEquals(listOf("new", "pc"), state.displayedDevices(now).map { it.id })
     }
+
+    @Test
+    fun `appareil qui surveillait puis se tait - les autres sont prevenus une fois puis a son retour`() {
+        val t0 = 1_800_000_000_000L
+        fun phone(seen: Long) = CloudDevice("tel", "Karim", "android", true, 1, seen, false)
+        val me = CloudDevice("me", "PC infirmerie", "windows", true, 3, t0, true)
+
+        sync.checkSilentDevices(listOf(me, phone(t0)), t0)
+        sync.checkSilentDevices(listOf(me, phone(t0)), t0 + 5 * 60_000L)
+        assertTrue(alarms.infos.isEmpty())
+
+        sync.checkSilentDevices(listOf(me, phone(t0)), t0 + 11 * 60_000L)
+        sync.checkSilentDevices(listOf(me, phone(t0)), t0 + 30 * 60_000L)
+        assertEquals(listOf("📵 Karim ne surveille plus"), alarms.infos)
+
+        sync.checkSilentDevices(listOf(me, phone(t0 + 40 * 60_000L)), t0 + 40 * 60_000L)
+        assertEquals("✅ Karim surveille de nouveau", alarms.infos.last())
+    }
+
+    @Test
+    fun `appareil silencieux - ancienne installation, appareil sans resident ou jamais vu en ligne ignores`() {
+        val t0 = 1_800_000_000_000L
+        // Vu hors ligne dès le lancement : rien à signaler (ancien appareil).
+        sync.checkSilentDevices(listOf(CloudDevice("vieux", "Tablette", "android", true, 2, t0 - 86_400_000L, false)), t0)
+        // En ligne sans résident suivi, puis muet.
+        sync.checkSilentDevices(listOf(CloudDevice("vide", "Accueil", "android", true, 0, t0, false)), t0)
+        sync.checkSilentDevices(listOf(CloudDevice("vide", "Accueil", "android", true, 0, t0, false)), t0 + 20 * 60_000L)
+        // Réinstallé : la nouvelle installation du même nom est en ligne.
+        sync.checkSilentDevices(listOf(CloudDevice("old", "Karim", "android", true, 1, t0, false)), t0)
+        sync.checkSilentDevices(
+            listOf(
+                CloudDevice("old", "Karim", "android", true, 1, t0, false),
+                CloudDevice("new", "Karim", "android", true, 1, t0 + 20 * 60_000L, false)
+            ),
+            t0 + 20 * 60_000L
+        )
+        assertTrue(alarms.infos.isEmpty())
+    }
 }

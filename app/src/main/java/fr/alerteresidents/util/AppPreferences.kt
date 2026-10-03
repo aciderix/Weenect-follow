@@ -71,6 +71,24 @@ class AppPreferences(context: Context) {
         get() = prefs.getLong(KEY_SHIFT, 0L)
         set(value) = prefs.edit().putLong(KEY_SHIFT, value).apply()
 
+    /** Dernier cycle de surveillance effectué (persistant : sert à repérer une interruption à la relance). */
+    var lastMonitoringBeat: Long
+        get() = prefs.getLong(KEY_BEAT, 0L)
+        set(value) = prefs.edit().putLong(KEY_BEAT, value).apply()
+
+    /** Intervalle de synchro en vigueur au dernier cycle (secondes). */
+    var lastMonitoringInterval: Int
+        get() = prefs.getInt(KEY_BEAT_INTERVAL, 15)
+        set(value) = prefs.edit().putInt(KEY_BEAT_INTERVAL, value).apply()
+
+    /** Dernier plantage non rapporté (« Exception : message »), écrit de façon synchrone avant l'arrêt. */
+    var pendingCrash: String?
+        get() = prefs.getString(KEY_CRASH, null)
+        set(value) {
+            val editor = if (value == null) prefs.edit().remove(KEY_CRASH) else prefs.edit().putString(KEY_CRASH, value)
+            editor.commit()
+        }
+
     fun setPin(pin: String?) {
         if (pin.isNullOrBlank()) prefs.edit().remove(KEY_PIN).apply()
         else prefs.edit().putString(KEY_PIN, PassphraseCrypto.hashPin(pin)).apply()
@@ -95,5 +113,8 @@ class AppPreferences(context: Context) {
         private const val KEY_LEGACY = "legacy_credentials_migrated"
         private const val KEY_SHIFT = "last_shift_check"
         private const val KEY_ALARM_SOUND = "alarm_sound"
+        private const val KEY_BEAT = "monitoring_last_beat"
+        private const val KEY_BEAT_INTERVAL = "monitoring_last_interval"
+        private const val KEY_CRASH = "pending_crash"
     }
 }

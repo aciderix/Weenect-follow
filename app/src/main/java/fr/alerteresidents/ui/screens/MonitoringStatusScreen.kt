@@ -66,7 +66,35 @@ import fr.alerteresidents.ui.theme.SafeNavy
 import fr.alerteresidents.ui.components.CloudDevicesList
 import fr.alerteresidents.ui.components.CloudStatusLine
 import fr.alerteresidents.ui.viewmodel.ResidentViewModel
+import fr.alerteresidents.service.MonitoringWatchdog
 import fr.alerteresidents.util.AppPreferences
+
+/**
+ * Fabricants dont l'économiseur de batterie arrête les applis en arrière-plan malgré le service
+ * au premier plan → page dontkillmyapp.com qui explique les réglages à faire, marque par marque.
+ */
+fun aggressiveOemGuide(manufacturer: String = Build.MANUFACTURER ?: ""): String? {
+    val brand = manufacturer.trim().lowercase()
+    val slug = when {
+        brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco") -> "xiaomi"
+        brand.contains("huawei") -> "huawei"
+        brand.contains("honor") -> "honor"
+        brand.contains("samsung") -> "samsung"
+        brand.contains("oneplus") -> "oneplus"
+        brand.contains("oppo") -> "oppo"
+        brand.contains("realme") -> "realme"
+        brand.contains("vivo") -> "vivo"
+        brand.contains("meizu") -> "meizu"
+        brand.contains("asus") -> "asus"
+        brand.contains("sony") -> "sony"
+        brand.contains("motorola") -> "motorola"
+        brand.contains("nokia") || brand.contains("hmd") -> "nokia"
+        brand.contains("wiko") -> "wiko"
+        brand.contains("tecno") || brand.contains("infinix") -> "tecno"
+        else -> null
+    }
+    return slug?.let { "https://dontkillmyapp.com/$it" }
+}
 
 data class PermissionCheck(val label: String, val ok: Boolean, val help: String, val fix: (() -> Unit)?)
 
@@ -97,6 +125,11 @@ fun phoneChecks(context: Context): List<PermissionCheck> {
             "Surveillance sans restriction de batterie", pm.isIgnoringBatteryOptimizations(pkg),
             "Évite qu'Android endorme la surveillance la nuit.",
             open(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$pkg")))
+        ),
+        PermissionCheck(
+            "Relance automatique si Android arrête l'app", MonitoringWatchdog.canScheduleExact(context),
+            "Autorisez « Alarmes et rappels » : la surveillance est relancée même en veille profonde.",
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) open(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$pkg"))) else null
         ),
         PermissionCheck("Connexion internet", online, "La position des balises est lue sur le serveur Weenect.",
             open(Intent(Settings.ACTION_WIRELESS_SETTINGS)))
@@ -167,6 +200,17 @@ fun MonitoringStatusScreen(viewModel: ResidentViewModel, onBack: () -> Unit, mod
                         }
                         if (!check.ok && check.fix != null) TextButton(onClick = check.fix) { Text("Corriger") }
                     }
+                }
+                aggressiveOemGuide()?.let { guide ->
+                    Text(
+                        "Les téléphones ${Build.MANUFACTURER} peuvent arrêter la surveillance pour économiser la batterie, " +
+                            "même avec les réglages ci-dessus. Suivez le guide pour ce modèle (démarrage auto, " +
+                            "verrouiller l'appli dans les applis récentes, aucune restriction).",
+                        fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(onClick = {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(guide)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }) { Text("Guide ${Build.MANUFACTURER}") }
                 }
             }
 
