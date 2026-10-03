@@ -81,6 +81,7 @@ class DesktopApp(
         cipher = cipher,
         residents = store,
         zones = store,
+        config = fr.alerteresidents.desktop.data.DesktopConfigStore(store),
         repository = repository,
         alarms = object : CloudAlarmPort {
             override fun alarmStartedAt(residentId: Long) = alarms.activeAlarms.value[residentId]?.startedAt
@@ -103,7 +104,7 @@ class DesktopApp(
     }
 
     companion object {
-        const val APP_VERSION = "2.0.0"
+        const val APP_VERSION = "2.1.0"
 
         fun defaultDeviceName(): String =
             (System.getenv("COMPUTERNAME") ?: runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull())

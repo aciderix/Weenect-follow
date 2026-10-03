@@ -2,6 +2,22 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Les versions suivent [SemVer](https://semver.org/lang/fr/).
 
+## [2.1.0] — 2026-10-03
+
+### Synchronisation automatique des résidents (Supabase)
+- Un résident ajouté, modifié ou retiré sur un appareil apparaît, change ou disparaît automatiquement sur tous les autres, en quelques secondes. Fini l'ajout manuel sur chaque téléphone et chaque PC.
+- Idem pour les comptes Weenect et la zone de l'établissement.
+- Les mots de passe Weenect sont partagés chiffrés par la **phrase secrète de l'établissement**, saisie une fois par appareil et vérifiée auprès du projet.
+- Au premier raccordement, les fiches déjà présentes sont rattachées aux fiches partagées de même balise (sans balise : même nom et même chambre), sans doublon.
+- Remplace « Publier / Récupérer la configuration ».
+
+### Sécurité
+- Une sortie signalée par un autre appareil fait sonner celui-ci **même si le résident n'y est pas encore configuré** (auparavant, l'alerte était ignorée).
+
+### Technique
+- Nouveau script `supabase/migrations/20261003120000_sync_configuration.sql`, à exécuter après le premier.
+- Base Android v5 (identifiant de synchronisation), migration testée sans perte de données.
+
 ## [2.0.0] — 2026-10-03
 
 Première version publiée : refonte complète après audit, application Windows et partage entre appareils.
@@ -35,4 +51,5 @@ Première version publiée : refonte complète après audit, application Windows
 - Sirène intégrée (« Alarme détecteur de fumée 3 », La Sonothèque).
 - Plus de 110 tests automatisés : moteur, migration, chiffrement, partage, rendu des écrans.
 
+[2.1.0]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.0
 [2.0.0]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.0.0

@@ -1,0 +1,484 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "a92670f4facdbe42cd5f5d1b6d7e4459",
+    "entities": [
+      {
+        "tableName": "residents",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `roomNumber` TEXT NOT NULL, `photoUri` TEXT, `avatarColorHex` TEXT NOT NULL, `weenectUsername` TEXT NOT NULL, `weenectPassword` TEXT NOT NULL, `trackerId` INTEGER, `trackerName` TEXT, `lastLatitude` REAL, `lastLongitude` REAL, `lastBattery` INTEGER, `lastSpeed` REAL, `lastUpdatedTime` INTEGER, `isInZone` INTEGER NOT NULL, `distanceFromCenterMeters` REAL NOT NULL, `emergencyContact` TEXT NOT NULL, `notes` TEXT NOT NULL, `isTrackingActive` INTEGER NOT NULL, `accountId` INTEGER, `unit` TEXT NOT NULL, `riskLevel` INTEGER NOT NULL, `lastSyncTime` INTEGER, `lastSyncError` TEXT, `lastSyncErrorAt` INTEGER, `accuracyMeters` INTEGER, `lastFixId` TEXT, `pendingExitFixId` TEXT, `pendingExitAt` INTEGER, `exitedAt` INTEGER, `alertState` TEXT NOT NULL, `alertHandledBy` TEXT, `alertHandledAt` INTEGER, `lastAlarmAt` INTEGER, `pausedUntil` INTEGER, `pauseReason` TEXT, `lowBatteryNotified` INTEGER NOT NULL, `offlineNotified` INTEGER NOT NULL, `isInDeepSleep` INTEGER NOT NULL, `syncId` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "roomNumber",
+            "columnName": "roomNumber",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "photoUri",
+            "columnName": "photoUri",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "avatarColorHex",
+            "columnName": "avatarColorHex",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weenectUsername",
+            "columnName": "weenectUsername",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weenectPassword",
+            "columnName": "weenectPassword",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trackerId",
+            "columnName": "trackerId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "trackerName",
+            "columnName": "trackerName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastLatitude",
+            "columnName": "lastLatitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lastLongitude",
+            "columnName": "lastLongitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lastBattery",
+            "columnName": "lastBattery",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastSpeed",
+            "columnName": "lastSpeed",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lastUpdatedTime",
+            "columnName": "lastUpdatedTime",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isInZone",
+            "columnName": "isInZone",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distanceFromCenterMeters",
+            "columnName": "distanceFromCenterMeters",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "emergencyContact",
+            "columnName": "emergencyContact",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isTrackingActive",
+            "columnName": "isTrackingActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "accountId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "unit",
+            "columnName": "unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "riskLevel",
+            "columnName": "riskLevel",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSyncTime",
+            "columnName": "lastSyncTime",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastSyncError",
+            "columnName": "lastSyncError",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastSyncErrorAt",
+            "columnName": "lastSyncErrorAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "accuracyMeters",
+            "columnName": "accuracyMeters",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastFixId",
+            "columnName": "lastFixId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pendingExitFixId",
+            "columnName": "pendingExitFixId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pendingExitAt",
+            "columnName": "pendingExitAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "exitedAt",
+            "columnName": "exitedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "alertState",
+            "columnName": "alertState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alertHandledBy",
+            "columnName": "alertHandledBy",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "alertHandledAt",
+            "columnName": "alertHandledAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastAlarmAt",
+            "columnName": "lastAlarmAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "pausedUntil",
+            "columnName": "pausedUntil",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "pauseReason",
+            "columnName": "pauseReason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lowBatteryNotified",
+            "columnName": "lowBatteryNotified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "offlineNotified",
+            "columnName": "offlineNotified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isInDeepSleep",
+            "columnName": "isInDeepSleep",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "facility_zone",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `name` TEXT NOT NULL, `address` TEXT NOT NULL, `centerLatitude` REAL NOT NULL, `centerLongitude` REAL NOT NULL, `radiusMeters` REAL NOT NULL, `isZoneActive` INTEGER NOT NULL, `zoneType` TEXT NOT NULL, `polygonPointsJson` TEXT NOT NULL, `soundAlertsEnabled` INTEGER NOT NULL, `vibrateAlertsEnabled` INTEGER NOT NULL, `refreshIntervalSeconds` INTEGER NOT NULL, `extraZonesJson` TEXT NOT NULL, `nightModeEnabled` INTEGER NOT NULL, `nightStartHour` INTEGER NOT NULL, `nightEndHour` INTEGER NOT NULL, `nightRefreshIntervalSeconds` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "centerLatitude",
+            "columnName": "centerLatitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "centerLongitude",
+            "columnName": "centerLongitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "radiusMeters",
+            "columnName": "radiusMeters",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isZoneActive",
+            "columnName": "isZoneActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "zoneType",
+            "columnName": "zoneType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "polygonPointsJson",
+            "columnName": "polygonPointsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "soundAlertsEnabled",
+            "columnName": "soundAlertsEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vibrateAlertsEnabled",
+            "columnName": "vibrateAlertsEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "refreshIntervalSeconds",
+            "columnName": "refreshIntervalSeconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "extraZonesJson",
+            "columnName": "extraZonesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nightModeEnabled",
+            "columnName": "nightModeEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nightStartHour",
+            "columnName": "nightStartHour",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nightEndHour",
+            "columnName": "nightEndHour",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nightRefreshIntervalSeconds",
+            "columnName": "nightRefreshIntervalSeconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "alert_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `residentId` INTEGER NOT NULL, `residentName` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `alertType` TEXT NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `distanceMeters` REAL NOT NULL, `isAcknowledged` INTEGER NOT NULL, `acknowledgedBy` TEXT, `acknowledgedAt` INTEGER, `isDrill` INTEGER NOT NULL, `details` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "residentId",
+            "columnName": "residentId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "residentName",
+            "columnName": "residentName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alertType",
+            "columnName": "alertType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distanceMeters",
+            "columnName": "distanceMeters",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isAcknowledged",
+            "columnName": "isAcknowledged",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "acknowledgedBy",
+            "columnName": "acknowledgedBy",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "acknowledgedAt",
+            "columnName": "acknowledgedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isDrill",
+            "columnName": "isDrill",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "details",
+            "columnName": "details",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "weenect_accounts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `label` TEXT NOT NULL, `username` TEXT NOT NULL, `encryptedPassword` TEXT NOT NULL, `syncId` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "username",
+            "columnName": "username",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "encryptedPassword",
+            "columnName": "encryptedPassword",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a92670f4facdbe42cd5f5d1b6d7e4459')"
+    ]
+  }
+}

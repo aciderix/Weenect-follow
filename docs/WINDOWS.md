@@ -29,7 +29,9 @@ Au premier lancement, l'application s'inscrit pour **démarrer automatiquement �
 
 ## Reprendre la configuration du téléphone
 
-Sur le téléphone : **Paramètres → Sauvegarde / nouveau téléphone → Exporter** (avec un code pour inclure les mots de passe Weenect) puis transférer le fichier sur le PC (mail, clé USB…).
+**Avec le partage Supabase** : connectez le PC au projet (Paramètres › Partage entre appareils). Les résidents, comptes et la zone arrivent automatiquement.
+
+**Sans Supabase** : sur le téléphone : **Paramètres → Sauvegarde / nouveau téléphone → Exporter** (avec un code pour inclure les mots de passe Weenect) puis transférer le fichier sur le PC (mail, clé USB…).
 Sur le PC : **Paramètres → Sauvegarde / import depuis le téléphone → Importer**, choisir le fichier et saisir le code.
 
 ## Pour que la surveillance soit fiable
@@ -41,7 +43,7 @@ Sur le PC : **Paramètres → Sauvegarde / import depuis le téléphone → Impo
 ## Déploiement sur plusieurs postes (infirmerie, cadres de santé…)
 
 - Installer le `.msi` sur chaque PC.
-- **Recommandé : relier tous les appareils à un projet Supabase** (voir [SUPABASE.md](SUPABASE.md)). Une sortie détectée par un appareil sonne alors sur tous, et « Je m'en occupe » coupe l'alarme partout avec le nom du soignant. La configuration (zone, résidents, comptes) se récupère en un clic.
+- **Recommandé : relier tous les appareils à un projet Supabase** (voir [SUPABASE.md](SUPABASE.md)). Une sortie détectée par un appareil sonne alors sur tous, et « Je m'en occupe » coupe l'alarme partout avec le nom du soignant. Les résidents, comptes Weenect et la zone se synchronisent automatiquement entre tous les appareils.
 - Sans Supabase, chaque poste surveille et sonne seul : il faut couper l'alarme sur chacun. La configuration se transmet alors par export/import de fichier depuis le téléphone.
 - Chaque poste interroge Weenect toutes les 15 s environ : avec beaucoup de postes, gardez un œil sur l'écran **État** (erreurs de connexion Weenect).
 - Le proxy internet configuré dans Windows est utilisé automatiquement. Si le service informatique bloque les applications non signées, transmettez-lui le `.msi` pour qu'il l'autorise.

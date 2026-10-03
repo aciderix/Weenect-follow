@@ -58,24 +58,7 @@ object BackupCodec {
             "appVersion" to "2.0",
             "exportTimestamp" to System.currentTimeMillis(),
             "exportedBy" to exportedBy,
-            "facilityZone" to linkedMapOf<String, Any?>(
-                "name" to facilityZone.name,
-                "address" to facilityZone.address,
-                "centerLatitude" to facilityZone.centerLatitude,
-                "centerLongitude" to facilityZone.centerLongitude,
-                "radiusMeters" to facilityZone.radiusMeters,
-                "isZoneActive" to facilityZone.isZoneActive,
-                "zoneType" to facilityZone.zoneType,
-                "polygonPointsJson" to facilityZone.polygonPointsJson,
-                "soundAlertsEnabled" to facilityZone.soundAlertsEnabled,
-                "vibrateAlertsEnabled" to facilityZone.vibrateAlertsEnabled,
-                "refreshIntervalSeconds" to facilityZone.refreshIntervalSeconds,
-                "extraZonesJson" to facilityZone.extraZonesJson,
-                "nightModeEnabled" to facilityZone.nightModeEnabled,
-                "nightStartHour" to facilityZone.nightStartHour,
-                "nightEndHour" to facilityZone.nightEndHour,
-                "nightRefreshIntervalSeconds" to facilityZone.nightRefreshIntervalSeconds
-            ),
+            "facilityZone" to zoneToMap(facilityZone),
             "accounts" to accountList
         )
         if (!passphrase.isNullOrBlank() && secrets.isNotEmpty()) {
@@ -109,26 +92,7 @@ object BackupCodec {
         val root = mapAdapter.fromJson(jsonString) ?: throw IllegalArgumentException("vide")
         @Suppress("UNCHECKED_CAST")
         val z = root["facilityZone"] as? Map<String, Any?> ?: throw IllegalArgumentException("zone manquante")
-        val d = FacilityZone()
-        val zone = FacilityZone(
-            id = 1,
-            name = z.str("name", d.name),
-            address = z.str("address", ""),
-            centerLatitude = z.dbl("centerLatitude", d.centerLatitude),
-            centerLongitude = z.dbl("centerLongitude", d.centerLongitude),
-            radiusMeters = z.dbl("radiusMeters", 150.0),
-            isZoneActive = z.bool("isZoneActive", true),
-            zoneType = z.str("zoneType", "CIRCLE"),
-            polygonPointsJson = z.str("polygonPointsJson", ""),
-            soundAlertsEnabled = z.bool("soundAlertsEnabled", true),
-            vibrateAlertsEnabled = z.bool("vibrateAlertsEnabled", true),
-            refreshIntervalSeconds = z.int("refreshIntervalSeconds", 15),
-            extraZonesJson = z.str("extraZonesJson", ""),
-            nightModeEnabled = z.bool("nightModeEnabled", false),
-            nightStartHour = z.int("nightStartHour", d.nightStartHour),
-            nightEndHour = z.int("nightEndHour", d.nightEndHour),
-            nightRefreshIntervalSeconds = z.int("nightRefreshIntervalSeconds", d.nightRefreshIntervalSeconds)
-        )
+        val zone = zoneFromMap(z)
         require(zone.centerLatitude in -90.0..90.0 && zone.centerLongitude in -180.0..180.0) { "Coordonnées invalides" }
         require(zone.radiusMeters > 0) { "Rayon invalide" }
 
@@ -175,6 +139,49 @@ object BackupCodec {
         val json = PassphraseCrypto.decrypt(blob, passphrase) ?: return null
         val map = mapAdapter.fromJson(json) ?: return null
         return map.entries.associate { it.key.toLong() to it.value.toString() }
+    }
+
+    /** Zone ↔ objet JSON (sauvegarde et synchronisation Supabase). */
+    fun zoneToMap(zone: FacilityZone): Map<String, Any?> = linkedMapOf(
+        "name" to zone.name,
+        "address" to zone.address,
+        "centerLatitude" to zone.centerLatitude,
+        "centerLongitude" to zone.centerLongitude,
+        "radiusMeters" to zone.radiusMeters,
+        "isZoneActive" to zone.isZoneActive,
+        "zoneType" to zone.zoneType,
+        "polygonPointsJson" to zone.polygonPointsJson,
+        "soundAlertsEnabled" to zone.soundAlertsEnabled,
+        "vibrateAlertsEnabled" to zone.vibrateAlertsEnabled,
+        "refreshIntervalSeconds" to zone.refreshIntervalSeconds,
+        "extraZonesJson" to zone.extraZonesJson,
+        "nightModeEnabled" to zone.nightModeEnabled,
+        "nightStartHour" to zone.nightStartHour,
+        "nightEndHour" to zone.nightEndHour,
+        "nightRefreshIntervalSeconds" to zone.nightRefreshIntervalSeconds
+    )
+
+    fun zoneFromMap(z: Map<String, Any?>): FacilityZone {
+        val d = FacilityZone()
+        return FacilityZone(
+            id = 1,
+            name = z.str("name", d.name),
+            address = z.str("address", ""),
+            centerLatitude = z.dbl("centerLatitude", d.centerLatitude),
+            centerLongitude = z.dbl("centerLongitude", d.centerLongitude),
+            radiusMeters = z.dbl("radiusMeters", 150.0),
+            isZoneActive = z.bool("isZoneActive", true),
+            zoneType = z.str("zoneType", "CIRCLE"),
+            polygonPointsJson = z.str("polygonPointsJson", ""),
+            soundAlertsEnabled = z.bool("soundAlertsEnabled", true),
+            vibrateAlertsEnabled = z.bool("vibrateAlertsEnabled", true),
+            refreshIntervalSeconds = z.int("refreshIntervalSeconds", 15),
+            extraZonesJson = z.str("extraZonesJson", ""),
+            nightModeEnabled = z.bool("nightModeEnabled", false),
+            nightStartHour = z.int("nightStartHour", d.nightStartHour),
+            nightEndHour = z.int("nightEndHour", d.nightEndHour),
+            nightRefreshIntervalSeconds = z.int("nightRefreshIntervalSeconds", d.nightRefreshIntervalSeconds)
+        )
     }
 
     private fun Map<String, Any?>.str(k: String, def: String) = (this[k] as? String) ?: def

@@ -13,5 +13,7 @@ data class WeenectAccount(
     val id: Long = 0,
     val label: String,
     val username: String,
-    val encryptedPassword: String
+    val encryptedPassword: String,
+    /** Identifiant partagé entre appareils (synchronisation Supabase). */
+    val syncId: String? = null
 )

@@ -10,7 +10,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** La mise à jour v3 → v4 conserve résidents, zone et journal (plus de migration destructive). */
+/** Les mises à jour de la base conservent résidents, zone, comptes et journal (jamais de migration destructive). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], application = Application::class)
 class MigrationTest {
@@ -59,6 +59,36 @@ class MigrationTest {
             assertEquals(0, c.getInt(1))
         }
         db.query("SELECT COUNT(*) FROM weenect_accounts").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+    }
+
+    /** v4 → v5 : ajout de l'identifiant de synchronisation, sans toucher aux fiches ni aux comptes. */
+    @Test
+    fun migrate4To5KeepsData() {
+        helper.createDatabase(DB, 4).use { db ->
+            db.execSQL("INSERT INTO weenect_accounts (id, label, username, encryptedPassword) VALUES (1, 'Etab', 'a@b.fr', 'x')")
+            db.execSQL(
+                "INSERT INTO residents (id, name, roomNumber, avatarColorHex, weenectUsername, weenectPassword, trackerId, " +
+                    "isInZone, distanceFromCenterMeters, emergencyContact, notes, isTrackingActive, accountId, unit, riskLevel, " +
+                    "alertState, lowBatteryNotified, offlineNotified, isInDeepSleep) VALUES " +
+                    "(1, 'Jean', '12', '#000000', '', '', 42, 1, 0.0, '', '', 1, 1, 'Unité A', 2, 'NONE', 0, 0, 0)"
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(DB, 5, true, AppDatabase.MIGRATION_4_5)
+
+        db.query("SELECT name, unit, riskLevel, accountId, syncId FROM residents").use { c ->
+            c.moveToFirst()
+            assertEquals("Jean", c.getString(0))
+            assertEquals("Unité A", c.getString(1))
+            assertEquals(2, c.getInt(2))
+            assertEquals(1, c.getInt(3))
+            assertEquals(true, c.isNull(4))
+        }
+        db.query("SELECT username, syncId FROM weenect_accounts").use { c ->
+            c.moveToFirst()
+            assertEquals("a@b.fr", c.getString(0))
+            assertEquals(true, c.isNull(1))
+        }
     }
 
     private companion object {

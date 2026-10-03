@@ -121,6 +121,11 @@ class DesktopStore(private val dir: File) : ResidentStore, ZoneStore, AlertStore
     }
 
     @Synchronized
+    fun setResidentSyncId(id: Long, syncId: String) {
+        saveResidents(_residents.value.map { if (it.id == id) it.copy(syncId = syncId) else it })
+    }
+
+    @Synchronized
     fun setLegacyCredentials(id: Long, username: String, password: String) {
         saveResidents(_residents.value.map { if (it.id == id) it.copy(weenectUsername = username, weenectPassword = password) else it })
     }

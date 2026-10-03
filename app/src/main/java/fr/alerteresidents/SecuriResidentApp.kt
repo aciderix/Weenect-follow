@@ -88,6 +88,7 @@ class SecuriResidentApp : Application() {
             cipher = KeystoreCredentialCipher(),
             residents = database.residentDao(),
             zones = database.facilityZoneDao(),
+            config = fr.alerteresidents.data.local.RoomConfigStore(database),
             repository = weenectRepository,
             alarms = object : CloudAlarmPort {
                 override fun alarmStartedAt(residentId: Long) = soundAlertManager.activeAlarms.value[residentId]?.startedAt
