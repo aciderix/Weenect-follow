@@ -20,6 +20,7 @@ import fr.alerteresidents.data.model.AlertEvent
 import fr.alerteresidents.data.model.AlertType
 import fr.alerteresidents.domain.HealthSnapshot
 import fr.alerteresidents.domain.MonitoringHealth
+import fr.alerteresidents.domain.MonitoringSummary
 import fr.alerteresidents.domain.ResidentStatus
 import fr.alerteresidents.domain.ResidentStatusResolver
 import fr.alerteresidents.util.DateParsing
@@ -195,13 +196,7 @@ class ResidentMonitoringService : Service() {
         val statuses = fresh.map { ResidentStatusResolver.resolve(it, System.currentTimeMillis(), staleMinutes) }
         val out = statuses.count { it == ResidentStatus.OUT }
         val unknown = statuses.count { it == ResidentStatus.UNKNOWN || it == ResidentStatus.STALE }
-        val safe = statuses.count { it == ResidentStatus.SAFE }
-        val text = when {
-            out > 0 -> "🚨 $out résident(s) hors zone !" + if (unknown > 0) " • $unknown sans position fiable" else ""
-            allFailed -> "⚠️ Surveillance dégradée : aucune balise joignable"
-            unknown > 0 -> "⚠️ $unknown résident(s) sans position fiable • $safe en sécurité"
-            else -> "🟢 $safe résident(s) en sécurité"
-        } + if (night) " • mode nuit" else ""
+        val text = MonitoringSummary.ongoingText(statuses, allFailed, night)
         updateNotification(text, alert = out > 0 || allFailed || unknown > 0)
 
         // Purge quotidienne du journal (> 180 jours)

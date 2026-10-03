@@ -104,7 +104,7 @@ class DesktopApp(
     }
 
     companion object {
-        const val APP_VERSION = "2.1.1"
+        const val APP_VERSION = "2.1.2"
 
         fun defaultDeviceName(): String =
             (System.getenv("COMPUTERNAME") ?: runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull())
