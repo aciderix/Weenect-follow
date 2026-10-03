@@ -28,7 +28,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "::warning::Secrets SUPABASE_URL et SUPABASE_ANON_KEY absents : rien à faire (voir SUPABASE.md)."
+            echo "::warning::Secrets SUPABASE_URL et SUPABASE_ANON_KEY absents : rien à faire (voir docs/SUPABASE.md)."
             exit 0
           fi
           url="${SUPABASE_URL%/}"

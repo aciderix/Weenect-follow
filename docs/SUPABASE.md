@@ -38,7 +38,7 @@ Ce qui **n'est pas** stocké :
 
 Les résidents sont reconnus d'un appareil à l'autre par l'**identifiant de leur balise Weenect**. Il n'y a pas d'identifiant à synchroniser : deux appareils configurés séparément, par exemple par import de fichier, se comprennent tout de suite.
 
-Le schéma complet est versionné dans [`supabase/migrations/`](supabase/migrations). Le script est **idempotent** : il ne supprime jamais rien et peut être relancé sans risque.
+Le schéma complet est versionné dans [`supabase/migrations/`](../supabase/migrations). Le script est **idempotent** : il ne supprime jamais rien et peut être relancé sans risque.
 
 ---
 
@@ -86,7 +86,7 @@ Sur les autres : **Récupérer la config.**, puis saisissez la phrase et choisis
 Transmettez la phrase de vive voix, jamais par le même canal que les identifiants.
 
 ### 9. Empêcher la mise en pause (projets gratuits)
-Supabase met en pause un projet gratuit **après 7 jours sans activité**. L'action GitHub [`supabase-keepalive.yml`](.github/workflows/supabase-keepalive.yml) l'appelle 4 fois par jour.
+Supabase met en pause un projet gratuit **après 7 jours sans activité**. L'action GitHub [`supabase-keepalive.yml`](../.github/workflows/supabase-keepalive.yml) l'appelle 4 fois par jour.
 Sur GitHub, ouvrez **Settings › Secrets and variables › Actions › New repository secret** et créez :
 
 | Nom | Valeur |
@@ -121,7 +121,7 @@ Les noms des résidents et l'historique de leurs sorties sont des données perso
   - ou **auto-héberger Supabase** chez un hébergeur certifié HDS. L'app accepte n'importe quelle adresse de projet.
 - **Minimisation** : seule la position au moment de la sortie est conservée. Il n'y a ni trajet ni photo.
 - **Durée de conservation** : la fonction `purge_history(jours)` supprime les incidents clos, les sorties accompagnées terminées et les appareils inactifs plus anciens que la durée choisie. Une alerte en cours n'est jamais supprimée.
-  - **Purge automatique (recommandé)** : exécutez une fois [`supabase/optional/purge_automatique.sql`](supabase/optional/purge_automatique.sql) dans le SQL Editor. Il active l'extension `pg_cron` et planifie la purge chaque dimanche à 3 h 17 (UTC), avec une conservation de 365 jours. Adaptez cette durée avec votre DPO.
+  - **Purge automatique (recommandé)** : exécutez une fois [`supabase/optional/purge_automatique.sql`](../supabase/optional/purge_automatique.sql) dans le SQL Editor. Il active l'extension `pg_cron` et planifie la purge chaque dimanche à 3 h 17 (UTC), avec une conservation de 365 jours. Adaptez cette durée avec votre DPO.
   - **Purge manuelle** : `select public.purge_history(365);` dans le SQL Editor.
   - **Vérification** : `select * from cron.job;` affiche la planification, `select * from cron.job_run_details order by start_time desc limit 5;` les dernières exécutions.
 - **Droit d'accès / journal** : la table `incidents` donne l'historique complet (qui a pris en charge, quand, comment l'alerte a été levée).

@@ -272,7 +272,7 @@ _Tous les points de l'audit ont été traités, **sauf la synchronisation Supaba
 | `ZoneEvaluatorTest`, `ZoneTransitionTest`, `ResidentStatusResolverTest` | Logique pure : zones, transitions, statuts et tri par urgence |
 | `MigrationTest` | Migration de base v3 → v4 sans perte |
 | `ConfigBackupManagerTest`, `PassphraseCryptoTest`, `DateParsingTest`, `GeoUtilsTest`, `FacilityZoneTest` | Export/import (v1 et v2), chiffrement, PIN, dates, géométrie |
-| `UiSmokeTest` / `UiSmokeDarkTest` | Rendu réel de 11 écrans et dialogues avec 8 résidents dans tous les états, en clair et en sombre ; captures dans `app/build/ui-screenshots/` (aperçu dans `docs/captures/`) |
+| `UiSmokeTest` / `UiSmokeDarkTest` | Rendu réel de 11 écrans et dialogues avec 8 résidents dans tous les états, en clair et en sombre ; captures dans `app/build/ui-screenshots/` (aperçu dans `docs/captures/android_*.png`) |
 
 Android Lint : 0 erreur.
 

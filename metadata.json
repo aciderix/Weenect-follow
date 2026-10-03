@@ -1,5 +1,0 @@
-{
-  "name": "Alerte Résidents",
-  "description": "Application de télésurveillance et d'alerte en temps réel des résidents équipés de balises Weenect pour établissements de santé (MAS, EHPAD, FAM).",
-  "requestFramePermissions": []
-}
