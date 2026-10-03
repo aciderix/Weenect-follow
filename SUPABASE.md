@@ -120,7 +120,10 @@ Les noms des résidents et l'historique de leurs sorties sont des données perso
   - utiliser Supabase uniquement pour la coordination, en évitant les informations médicales dans les notes des fiches (elles sont incluses dans la configuration publiée) ;
   - ou **auto-héberger Supabase** chez un hébergeur certifié HDS. L'app accepte n'importe quelle adresse de projet.
 - **Minimisation** : seule la position au moment de la sortie est conservée. Il n'y a ni trajet ni photo.
-- **Durée de conservation** : la fonction `purge_history(jours)` supprime les incidents clos et les appareils inactifs plus anciens que la durée choisie. Lancez-la depuis le SQL Editor, par exemple `select public.purge_history(365);`, ou planifiez-la avec l'extension `pg_cron`.
+- **Durée de conservation** : la fonction `purge_history(jours)` supprime les incidents clos, les sorties accompagnées terminées et les appareils inactifs plus anciens que la durée choisie. Une alerte en cours n'est jamais supprimée.
+  - **Purge automatique (recommandé)** : exécutez une fois [`supabase/optional/purge_automatique.sql`](supabase/optional/purge_automatique.sql) dans le SQL Editor. Il active l'extension `pg_cron` et planifie la purge chaque dimanche à 3 h 17 (UTC), avec une conservation de 365 jours. Adaptez cette durée avec votre DPO.
+  - **Purge manuelle** : `select public.purge_history(365);` dans le SQL Editor.
+  - **Vérification** : `select * from cron.job;` affiche la planification, `select * from cron.job_run_details order by start_time desc limit 5;` les dernières exécutions.
 - **Droit d'accès / journal** : la table `incidents` donne l'historique complet (qui a pris en charge, quand, comment l'alerte a été levée).
 
 ---
