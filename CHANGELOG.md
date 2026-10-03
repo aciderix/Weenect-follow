@@ -9,6 +9,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Les
 - **Zone vierge** : un appareil neuf ne partage plus sa zone d'usine (« Mon établissement »). Une zone vierge déjà partagée n'écrase plus la vraie zone d'un appareil configuré : c'est la vraie zone qui est partagée à la place.
 - **Appareils en double** : après une réinstallation, l'ancienne installation hors ligne n'apparaît plus à côté de la nouvelle dans « Partage entre appareils ».
 
+### Amélioration
+- La fenêtre de connexion à Supabase demande aussi le **nom du soignant** de l'appareil, pré-rempli et modifiable. C'est lui qui s'affiche sur « Pris en charge par … » chez les autres.
+
 > La 2.1.1 doit encore être installée après désinstallation de la 2.1.0 (clé différente). Les versions suivantes s'installeront par-dessus.
 
 ## [2.1.0] — 2026-10-03
