@@ -2,6 +2,11 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Les versions suivent [SemVer](https://semver.org/lang/fr/).
 
+## [2.1.4] — 2026-10-05
+
+### Correction (Windows)
+- **Rouvrir la fenêtre depuis l'icône** : une fois la fenêtre fermée (réduite dans la zone de notification), double-cliquer sur l'icône ou faire clic droit › Ouvrir ne la rouvrait pas. C'est corrigé, ainsi que la relance du raccourci quand l'application tourne déjà et le démarrage automatique réduit. La fenêtre revient au premier plan.
+
 ## [2.1.3] — 2026-10-03
 
 ### Surveillance qui ne s'arrête plus en silence
@@ -81,6 +86,7 @@ Première version publiée : refonte complète après audit, application Windows
 - Sirène intégrée (« Alarme détecteur de fumée 3 », La Sonothèque).
 - Plus de 110 tests automatisés : moteur, migration, chiffrement, partage, rendu des écrans.
 
+[2.1.4]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.4
 [2.1.3]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.3
 [2.1.2]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.2
 [2.1.1]: https://github.com/aciderix/Weenect-follow/releases/tag/v2.1.1
