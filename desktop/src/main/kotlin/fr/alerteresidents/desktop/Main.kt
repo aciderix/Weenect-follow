@@ -25,6 +25,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -62,7 +63,9 @@ import fr.alerteresidents.ui.theme.AppStatusColors
 import fr.alerteresidents.ui.viewmodel.ResidentViewModel
 import fr.alerteresidents.util.DesktopNotifier
 import fr.alerteresidents.util.MapsNavigator
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.util.logging.Logger
 import javax.imageio.ImageIO
 import javax.swing.JOptionPane
@@ -96,7 +99,17 @@ fun main(args: Array<String>) {
         val icon = remember { appIcon() }
         var visible by remember { mutableStateOf(!startMinimized || !isTraySupported) }
         val activeAlarms by viewModel.activeAlarms.collectAsState()
-        val showCount by showRequests.collectAsState()
+        val windowState = rememberWindowState(size = DpSize(1360.dp, 860.dp), position = WindowPosition(androidx.compose.ui.Alignment.Center))
+        var mainWindow by remember { mutableStateOf<java.awt.Window?>(null) }
+
+        // Double-clic sur l'icône, « Ouvrir », ou relance du raccourci : traité ici et non dans
+        // la fenêtre, dont le contenu ne se recompose plus tant qu'elle est cachée.
+        ShowOnRequest(showRequests) {
+            visible = true
+            windowState.isMinimized = false
+            delay(200) // le temps que la fenêtre soit réaffichée
+            mainWindow?.let { bringToFront(it, keepOnTop = viewModel.activeAlarms.value.isNotEmpty()) }
+        }
 
         remember {
             app.notifier = TrayNotifier(trayState)
@@ -135,7 +148,6 @@ fun main(args: Array<String>) {
             }
         )
 
-        val windowState = rememberWindowState(size = DpSize(1360.dp, 860.dp), position = WindowPosition(androidx.compose.ui.Alignment.Center))
         Window(
             onCloseRequest = {
                 if (isTraySupported) {
@@ -154,12 +166,9 @@ fun main(args: Array<String>) {
             alwaysOnTop = activeAlarms.isNotEmpty()
         ) {
             window.minimumSize = java.awt.Dimension(900, 600)
-            LaunchedEffect(showCount) {
-                if (showCount == 0) return@LaunchedEffect
-                visible = true
-                windowState.isMinimized = false
-                window.toFront()
-                window.requestFocus()
+            DisposableEffect(window) {
+                mainWindow = window
+                onDispose { mainWindow = null }
             }
             MyApplicationTheme {
                 AppContent(viewModel)
@@ -169,6 +178,29 @@ fun main(args: Array<String>) {
 }
 
 /** Notifications Windows via l'icône de la zone de notification. */
+/**
+ * Appelle [onShow] à chaque demande d'affichage. À placer au niveau de l'application, jamais
+ * dans une fenêtre : une fenêtre cachée ne recompose plus son contenu, la demande y serait perdue.
+ */
+@Composable
+internal fun ShowOnRequest(requests: StateFlow<Int>, onShow: suspend () -> Unit) {
+    val count by requests.collectAsState()
+    LaunchedEffect(count) { if (count > 0) onShow() }
+}
+
+/** Passe la fenêtre devant les autres applications (Windows refuse souvent un simple toFront). */
+internal fun bringToFront(window: java.awt.Window, keepOnTop: Boolean) {
+    java.awt.EventQueue.invokeLater {
+        if (window is java.awt.Frame && window.extendedState and java.awt.Frame.ICONIFIED != 0) {
+            window.extendedState = window.extendedState and java.awt.Frame.ICONIFIED.inv()
+        }
+        window.isAlwaysOnTop = true
+        window.toFront()
+        window.requestFocus()
+        window.isAlwaysOnTop = keepOnTop
+    }
+}
+
 private class TrayNotifier(private val tray: TrayState) : DesktopNotifier {
     override fun alert(title: String, message: String) = tray.sendNotification(Notification(title, message, Notification.Type.Error))
     override fun warning(title: String, message: String) = tray.sendNotification(Notification(title, message, Notification.Type.Warning))
